@@ -142,9 +142,12 @@ func loadConfig(defaultConfig string, overwriteWithInitial bool) *util.Config {
 		if isHttpUrl, _ := regexp.MatchString("^(?i)http(s|)://.+", defaultConfig); isHttpUrl {
 			util.Out("Downloading: %v", defaultConfig)
 			var response *http.Response
-			response, err = http.Get(defaultConfig)
-			if err == nil {
-				configSource = response.Body
+			if response, err = http.Get(defaultConfig); err == nil {
+				if response.StatusCode == 200 {
+					configSource = response.Body
+				} else {
+					err = fmt.Errorf(response.Status)
+				}
 			}
 		} else {
 			util.Out("Copying: %v", defaultConfig)
@@ -152,7 +155,7 @@ func loadConfig(defaultConfig string, overwriteWithInitial bool) *util.Config {
 		}
 
 		if err != nil {
-			panic(fmt.Sprintf("Failed loading %v;\ncause: %v; => exiting.", defaultConfig, err))
+			panic(fmt.Sprintf("Failed loading %v;\nCause: %v; => exiting.", defaultConfig, err))
 		}
 
 		if configFile, err := os.Create(ConfigName); err == nil {
