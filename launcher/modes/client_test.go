@@ -5,7 +5,7 @@ package modes
 
 import (
 	"testing"
-	util "github.com/jenkins-client-launcher/launcher/util"
+	util "github.com/jkellerer/jenkins-client-launcher/launcher/util"
 )
 
 var jenkinsNodePageHTML = `

@@ -117,7 +117,7 @@ Developing
 ----------
 
 - A Go IDE is recommended (e.g. one of IntelliJ, LiteIDE, Eclipse)
-- The project ROOT is `go-workspace\src\github.com\jkellerer\jenkins-client-launcher`.\
+- The project ROOT is `go-workspace\src\github.com\jkellerer\jenkins-client-launcher`.<br/>
   `go` should be called from this path.
 - **Installing Dependencies**:
 
