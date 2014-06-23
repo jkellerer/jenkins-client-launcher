@@ -1,7 +1,7 @@
 Jenkins Client Launcher [![Build Status](https://travis-ci.org/jkellerer/jenkins-client-launcher.png?branch=master)](https://travis-ci.org/jkellerer/jenkins-client-launcher)
 =======================
 
-_Jenkins Client Launcher_ is a simple native CLI executable that may be used to **bootstrap a Jenkins client** 
+_Jenkins Client Launcher_ is a simple native CLI executable that may be used to **bootstrap the Jenkins client** 
 for connecting a computer with Jenkins (a.k.a Jenkins Node).
 
 The main purpose of this project is to provide a tool that allows running Jenkins Nodes with 
@@ -39,6 +39,9 @@ Usage
 > launcher -help
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+_Hint:_ Help shows commandline options and it also creates a default config `launcher.config` 
+inside the current working directory should it be missing.
+
 ###Attaching a node to Jenkins
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,7 +69,8 @@ Usage
 </config>
 ```
 
-_Hint:_ Add `-name=name-of-node-in-jenkins` if the node name is not the same as the hostname of the computer where the launcher is started.
+_Hint:_ Add `-name=name-of-node-in-jenkins` if the node name is not the same as the hostname of 
+the computer where the launcher is started.
 
 ###Autostart next time the OS boots
 
@@ -74,11 +78,12 @@ _Hint:_ Add `-name=name-of-node-in-jenkins` if the node name is not the same as 
 > launcher -autostart=true
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-_Windows Hint:_ You should setup _Windows_ to boot directly to the desktop without asking for a password in order to let autostart run the launcher. 
+_Windows Hint:_ You should setup _Windows_ to boot directly to the desktop without asking for a password 
+in order to let autostart run the launcher. 
 
 ###Note on Jenkins Setup
 
-The current implemented run mode **client** requires to create a _Dumb Slave_ in Jenkins using the following settings:
+The currently implemented run mode **client** requires the manual creation of a _Dumb Slave_ in Jenkins using the following settings:
 
 Parameter             | Value
 ----------------------|-----------------------------
@@ -89,17 +94,22 @@ Building
 --------
 
 - **Go >= 1.2** is required
+- **Create Go Workspace** if missing:
+
+```Batchfile
+mkdir go-workspace
+cd go-workspace 
+set "GOPATH=%CD%" REM Add this to the environment if you plan to do more than just one build.
+```
+
 - **Download & Build**:
 
 ```Batchfile
-mkdir launcher-workspace
-cd launcher-workspace 
-set "GOPATH=%CD%"
-
 go get github.com/jkellerer/jenkins-client-launcher
 cd src\github.com\jkellerer\jenkins-client-launcher
 
-go get ... && go build launcher.go
+go get ...
+go build launcher.go
 ```
 
 
@@ -107,23 +117,24 @@ Developing
 ----------
 
 - A Go IDE is recommended (e.g. one of IntelliJ, LiteIDE, Eclipse)
-- Clone the GIT repo instead of using `go get`
+- The project ROOT is `go-workspace\src\github.com\jkellerer\jenkins-client-launcher`.\
+  `go` should be called from this path.
 - **Installing Dependencies**:
 
 ```Batchfile
-go get src/...
+go get ./...
 ```
 
 - **Building**:
 
 ```Batchfile
-go build src/launcher.go
+go build launcher.go
 ```
 
 - **Running All Tests**:
 
 ```Batchfile
-go test launcher/...
+go test ./...
 ```
 
 
