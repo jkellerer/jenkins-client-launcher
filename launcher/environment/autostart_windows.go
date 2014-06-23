@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"os/exec"
 	"sync"
-	"launcher/util"
+	util "github.com/jenkins-client-launcher/launcher/util"
 )
 
 const (

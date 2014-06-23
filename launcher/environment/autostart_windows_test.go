@@ -5,7 +5,7 @@ package environment
 
 import (
 	"testing"
-	"launcher/util"
+	util "github.com/jenkins-client-launcher/launcher/util"
 )
 
 var handler = NewAutostartHandler()

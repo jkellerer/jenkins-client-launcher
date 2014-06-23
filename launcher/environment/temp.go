@@ -5,7 +5,7 @@ package environment
 
 import (
 	"os"
-	"launcher/util"
+	util "github.com/jenkins-client-launcher/launcher/util"
 	"path/filepath"
 	"time"
 )

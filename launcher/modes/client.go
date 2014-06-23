@@ -5,7 +5,7 @@ package modes
 
 import (
 	"time"
-	"launcher/util"
+	util "github.com/jenkins-client-launcher/launcher/util"
 	"fmt"
 	"io/ioutil"
 	"regexp"

@@ -4,8 +4,8 @@
 package environment
 
 import (
-	"launcher/util"
-	"launcher/modes"
+	util "github.com/jenkins-client-launcher/launcher/util"
+	modes "github.com/jenkins-client-launcher/launcher/modes"
 	"fmt"
 	"encoding/xml"
 	"time"

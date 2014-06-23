@@ -4,7 +4,7 @@
 package environment
 
 import (
-	"launcher/util"
+	util "github.com/jenkins-client-launcher/launcher/util"
 )
 
 // Defines an interface for implementations that prepare or monitor the environment.
