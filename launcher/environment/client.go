@@ -4,8 +4,8 @@
 package environment
 
 import (
-	modes "github.com/jkellerer/jenkins-client-launcher/launcher/modes"
-	util "github.com/jkellerer/jenkins-client-launcher/launcher/util"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/modes"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
 	"io"
 	"fmt"
 	"os"

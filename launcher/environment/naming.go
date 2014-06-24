@@ -4,7 +4,7 @@
 package environment
 
 import (
-	util "github.com/jkellerer/jenkins-client-launcher/launcher/util"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
 	"encoding/xml"
 	"os"
 	"strings"

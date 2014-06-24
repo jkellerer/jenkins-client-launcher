@@ -5,7 +5,7 @@ package modes
 
 import (
 	"testing"
-	util "github.com/jkellerer/jenkins-client-launcher/launcher/util"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
 )
 
 func TestServerModeIsRegistered(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"net"
 	"time"
-	util "github.com/jkellerer/jenkins-client-launcher/launcher/util"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
 	"os"
 )
 

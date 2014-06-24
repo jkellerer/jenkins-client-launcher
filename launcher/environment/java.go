@@ -4,11 +4,11 @@
 package environment
 
 import (
-	util "github.com/jkellerer/jenkins-client-launcher/launcher/util"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
 	"fmt"
 	"os/exec"
 	"regexp"
-	version "github.com/mcuadros/go-version"
+	"github.com/mcuadros/go-version"
 )
 
 const (

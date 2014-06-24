@@ -4,7 +4,7 @@
 package modes
 
 import (
-	util "github.com/jkellerer/jenkins-client-launcher/launcher/util"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
 	"os"
 	"os/signal"
 	"time"
