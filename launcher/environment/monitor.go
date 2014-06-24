@@ -53,7 +53,7 @@ type JenkinsNodeMonitor struct {
 }
 
 func (self *JenkinsNodeMonitor) IsConfigAcceptable(config *util.Config) (bool) {
-	if config.ClientMonitor && !config.HasCIConnection() {
+	if config.ClientMonitorStateOnServer && !config.HasCIConnection() {
 		util.GOut(self.Name(), "No Jenkins URI defined. Cannot monitor this node within Jenkins.");
 		return false;
 	}
@@ -69,7 +69,9 @@ func (self *JenkinsNodeMonitor) Prepare(config *util.Config) {
 		self.ticker.Stop()
 	}
 
-	if config.ClientMonitor {
+	if config.ClientMonitorStateOnServer {
+		maxOfflineCountBeforeRestart = config.ClientMonitorStateOnServerMaxFailures
+
 		self.ticker = time.NewTicker(nodeMonitoringInterval)
 
 		go func() {
