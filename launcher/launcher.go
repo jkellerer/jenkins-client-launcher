@@ -101,7 +101,7 @@ Options:
 	}
 
 	restartCount := int64(0)
-	sleepTimePerRestart := int64(time.Duration(config.SleepTimeSecondsBetweenFailures).Seconds())
+	sleepTimePerRestart := int64(time.Second * time.Duration(config.SleepTimeSecondsBetweenFailures))
 	runTimeAfterResettingRestartCount := time.Hour * 2
 
 	timeOfLastStart := time.Now()
