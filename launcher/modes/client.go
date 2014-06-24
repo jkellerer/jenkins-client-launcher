@@ -109,6 +109,10 @@ func (self *ClientMode) execute(config *util.Config) {
 		commandline = append(commandline, "-noCertificateCheck")
 	}
 
+	if config.HandleReconnectsInLauncher {
+		commandline = append(commandline, "-noReconnect")
+	}
+
 	if config.CIUsername != "" && config.CIPassword != "" && config.PassCIAuth {
 		commandline = append(commandline, "-auth", fmt.Sprintf("%s:%s", config.CIUsername, config.CIPassword))
 		//More testing is required, maybe secrets are not needed when this is added?

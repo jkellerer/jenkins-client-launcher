@@ -101,6 +101,7 @@ type ClientOptions struct {
 	PassCIAuth                       bool   `xml:"client>passAuth"`
 	ClientMonitor                    bool   `xml:"client>monitoring>stateOnServer"`
 	ClientMonitorConsole             bool   `xml:"client>monitoring>console"`
+	HandleReconnectsInLauncher       bool   `xml:"client>restart>handleReconnects"`
 	SleepTimeSecondsBetweenFailures  int64  `xml:"client>restart>sleepOnFailure>seconds"`
 }
 
@@ -148,6 +149,7 @@ func NewDefaultConfig() *Config {
 			ClientMonitorConsole: true,
 			SecretKey: "",
 			PassCIAuth: false,
+			HandleReconnectsInLauncher: false,
 			SleepTimeSecondsBetweenFailures: 30,
 		},
 		JavaOptions: JavaOptions{
