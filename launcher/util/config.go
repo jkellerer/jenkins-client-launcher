@@ -157,6 +157,7 @@ func NewDefaultConfig() *Config {
 		JavaOptions: JavaOptions{
 			// Configuring java to spend more time in garbage collection instead of using more memory.
 			// We want the memory for IO cache and other build processes and not to be wasted in unused heap.
+			// TODO: Add support for "jcmd <pid> GC.run" to call GC explicitly on schedule or when the node is known to be IDLE.
 			JavaArgs: []string {
 				"-Xms10m",
 				"-XX:+UseSerialGC",
@@ -209,8 +210,9 @@ func NewConfig(fileName string) *Config {
 
 			if err == nil {
 				config.NeedsSave = false;
-
-				// TODO: DeDup arrays
+				config.CleanTempLocationExclusions = config.deDuplicate(config.CleanTempLocationExclusions)
+				config.RestartTriggerTokens = config.deDuplicate(config.RestartTriggerTokens)
+				config.JavaArgs = config.deDuplicate(config.JavaArgs)
 			}
 		}
 	}
@@ -220,6 +222,30 @@ func NewConfig(fileName string) *Config {
 	}
 
 	return config;
+}
+
+// Returns a copy of the input list with all elements deduplicated.
+// The order of the original list is preserved.
+func (self *Config) deDuplicate(list []string) []string {
+	if list == nil {
+		return nil
+	}
+
+	uniqueList := []string{}
+	uniqueElements := map[string]bool{}
+
+	for _, item := range list {
+		uniqueElements[item] = true
+	}
+
+	for _, item := range list {
+		if uniqueElements[item] {
+			uniqueElements[item] = false
+			uniqueList = append(uniqueList, item)
+		}
+	}
+
+	return uniqueList
 }
 
 // Converts the config to a XML string.
