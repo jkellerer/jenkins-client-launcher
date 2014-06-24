@@ -101,7 +101,7 @@ Options:
 	}
 
 	restartCount := int64(0)
-	sleepTimePerRestart := time.Second * 30
+	sleepTimePerRestart := int64(time.Duration(config.SleepTimeSecondsBetweenFailures).Seconds())
 	runTimeAfterResettingRestartCount := time.Hour * 2
 
 	timeOfLastStart := time.Now()
@@ -115,7 +115,7 @@ Options:
 			restartCount = 0
 		}
 
-		if sleepTime := time.Duration(restartCount * int64(sleepTimePerRestart)); sleepTime > 0 {
+		if sleepTime := time.Duration(restartCount * sleepTimePerRestart); sleepTime > 0 {
 			fmt.Printf("Sleeping %v seconds before restarting the client.\n\n", sleepTime.Seconds())
 			time.Sleep(sleepTime)
 		}

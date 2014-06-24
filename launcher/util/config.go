@@ -96,11 +96,12 @@ type JavaOptions struct {
 }
 
 type ClientOptions struct {
-	ClientName              string `xml:"client>name"`
-	SecretKey               string `xml:"client>secretKey"`
-	PassCIAuth              bool   `xml:"client>passAuth"`
-	ClientMonitor           bool   `xml:"client>monitoring>stateOnServer"`
-	ClientMonitorConsole    bool   `xml:"client>monitoring>console"`
+	ClientName                       string `xml:"client>name"`
+	SecretKey                        string `xml:"client>secretKey"`
+	PassCIAuth                       bool   `xml:"client>passAuth"`
+	ClientMonitor                    bool   `xml:"client>monitoring>stateOnServer"`
+	ClientMonitorConsole             bool   `xml:"client>monitoring>console"`
+	SleepTimeSecondsBetweenFailures  int64  `xml:"client>restart>sleepOnFailure>seconds"`
 }
 
 type Maintenance struct {
@@ -147,6 +148,7 @@ func NewDefaultConfig() *Config {
 			ClientMonitorConsole: true,
 			SecretKey: "",
 			PassCIAuth: false,
+			SleepTimeSecondsBetweenFailures: 30,
 		},
 		JavaOptions: JavaOptions{
 			JavaArgs: []string {
