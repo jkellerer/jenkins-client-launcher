@@ -155,7 +155,16 @@ func NewDefaultConfig() *Config {
 			SleepTimeSecondsBetweenFailures: 30,
 		},
 		JavaOptions: JavaOptions{
+			// Configuring java to spend more time in garbage collection instead of using more memory.
+			// We want the memory for IO cache and other build processes and not to be wasted in unused heap.
 			JavaArgs: []string {
+				"-Xms10m",
+				"-XX:+UseSerialGC",
+				"-XX:GCTimeRatio=5",
+				"-XX:MaxGCPauseMillis=5000",
+				"-XX:MaxGCMinorPauseMillis=333",
+				"-XX:MaxHeapFreeRatio=25",
+				"-XX:MinHeapFreeRatio=10",
 				"-XX:+CMSClassUnloadingEnabled",
 			},
 		},

@@ -98,12 +98,15 @@ func (self *ClientMode) isStopped() bool {
 }
 
 func (self *ClientMode) execute(config *util.Config) {
-	commandline := config.JavaArgs
-	commandline = append(commandline, []string{
-			"-jar", util.ClientJar,
-			"-jnlpUrl", fmt.Sprintf("%v/computer/%v/slave-agent.jnlp", config.CIHostURI, config.ClientName),
-			"-secret", config.SecretKey,
-		}...)
+	commandline := []string{}
+	commandline = append(commandline, config.JavaArgs...)
+	commandline = append(commandline,
+		"-jar", util.ClientJar,
+		"-jnlpUrl", fmt.Sprintf("%v/computer/%v/slave-agent.jnlp", config.CIHostURI, config.ClientName))
+
+	if config.SecretKey != "" {
+		commandline = append(commandline, "-secret", config.SecretKey)
+	}
 
 	if config.CIAcceptAnyCert {
 		commandline = append(commandline, "-noCertificateCheck")
@@ -115,7 +118,6 @@ func (self *ClientMode) execute(config *util.Config) {
 
 	if config.CIUsername != "" && config.CIPassword != "" && config.PassCIAuth {
 		commandline = append(commandline, "-auth", fmt.Sprintf("%s:%s", config.CIUsername, config.CIPassword))
-		//More testing is required, maybe secrets are not needed when this is added?
 		//commandline = append(commandline, "-jnlpCredentials", fmt.Sprintf("%s:%s", config.CIUsername, config.CIPassword))
 	}
 
