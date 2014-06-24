@@ -5,6 +5,7 @@ package environment
 
 import (
 	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
+	"sync"
 )
 
 // Defines an interface for implementations that prepare or monitor the environment.
@@ -34,27 +35,36 @@ func VisitAllPreparers(fn func(EnvironmentPreparer)) {
 
 // Runs all registered preparers.
 func RunPreparers(config *util.Config) {
-	count := len(AllEnvironmentPreparers); countdown := make(chan bool, count)
+	work := new(sync.WaitGroup)
+	work.Add(len(AllEnvironmentPreparers))
+
+	enabledPreparers := map[string]bool{}
 
 	VisitAllPreparers(func(p EnvironmentPreparer) {
-		if !p.IsConfigAcceptable(config) {
-			panic("Environment preparer " + p.Name() + " does not accept the current configuration. Please adjust the config.")
+		if p.IsConfigAcceptable(config) {
+			enabledPreparers[p.Name()] = true
+		} else {
+			util.GOut("ENV", "WARN: Environment preparer " + p.Name() + " does not accept the current config and it won't operate.")
+			util.GOut("ENV", "Adjust the configuration to prevent the warning above.")
 		}
 	})
 
 	VisitAllPreparers(func(p EnvironmentPreparer) {
-		util.GOut("ENV", "Preparing %v", p.Name())
-		go func() {
-			defer func() {
-				countdown <- true
+		if enabledPreparers[p.Name()] {
+			util.GOut("ENV", "Preparing %v", p.Name())
+			go func() {
+				defer func() {
+					work.Done()
+				}()
+				p.Prepare(config)
 			}()
-			p.Prepare(config)
-		}()
+		} else {
+			util.GOut("ENV", "Skipping %v", p.Name())
+			work.Done()
+		}
 	})
 
-	for ; count > 0; count-- {
-		<-countdown
-	}
+	work.Wait()
 
 	util.GOut("ENV", "Finished preparing the environment.")
 }
