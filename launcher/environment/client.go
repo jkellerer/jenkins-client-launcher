@@ -70,7 +70,7 @@ func (self *JenkinsClientDownloader) downloadJar(config *util.Config) error {
 
 	if _, err = io.Copy(target, source); err == nil {
 		target.Close()
-		if err = os.Remove(ClientJarName); err == nil {
+		if err = os.Remove(ClientJarName); err == nil || os.IsNotExist(err) {
 			err = os.Rename(ClientJarDownloadName, ClientJarName)
 		}
 		return err
