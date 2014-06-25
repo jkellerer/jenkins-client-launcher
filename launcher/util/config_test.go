@@ -35,6 +35,7 @@ func saveAndLoadConfig() (config *Config, defaultConfig *Config) {
 
 	config, defaultConfig = NewDefaultConfig(), NewDefaultConfig()
 	config.RestartTriggerTokens = []string {"1", "2"}
+	config.JavaArgs = []string {}
 	config.Save("~existing.xml")
 	config = NewConfig("~existing.xml")
 
@@ -49,7 +50,15 @@ func TestCanSafeConfig(t *testing.T) {
 	}
 }
 
-func TestStringsAreDeDuplicatedAfterLoad(t *testing.T) {
+func TestStringListsCanBeCustomized(t *testing.T) {
+	config, _ := saveAndLoadConfig()
+	in, out := fmt.Sprintf("%v", config.RestartTriggerTokens), fmt.Sprintf("%v", []string {"1", "2"})
+	if in != out {
+		t.Errorf("config.RestartTriggerTokens != %v, should be %v", in, out)
+	}
+}
+
+func TestStringListsAreFilledWithDefaultValuesWhenEmpty(t *testing.T) {
 	config, defaultConfig := saveAndLoadConfig()
 	in, out := fmt.Sprintf("%v", config.JavaArgs), fmt.Sprintf("%v", defaultConfig.JavaArgs)
 	if in != out {

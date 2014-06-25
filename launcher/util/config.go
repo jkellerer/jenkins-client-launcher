@@ -206,14 +206,15 @@ func NewConfig(fileName string) *Config {
 
 		if err == nil && !fileInfo.IsDir() {
 			Out("Loading configuration from %v", fileName)
-			err := xml.NewDecoder(file).Decode(config)
 
-			if err == nil {
+			lists := []*[]string {&config.CleanTempLocationExclusions, &config.RestartTriggerTokens, &config.JavaArgs}
+			captures := config.captureLists(lists...)
+
+			if err := xml.NewDecoder(file).Decode(config); err == nil {
 				config.NeedsSave = false;
-				config.CleanTempLocationExclusions = config.deDuplicate(config.CleanTempLocationExclusions)
-				config.RestartTriggerTokens = config.deDuplicate(config.RestartTriggerTokens)
-				config.JavaArgs = config.deDuplicate(config.JavaArgs)
 			}
+
+			config.restoreListsIfEmpty(captures, lists...)
 		}
 	}
 
@@ -224,28 +225,25 @@ func NewConfig(fileName string) *Config {
 	return config;
 }
 
-// Returns a copy of the input list with all elements deduplicated.
-// The order of the original list is preserved.
-func (self *Config) deDuplicate(list []string) []string {
-	if list == nil {
-		return nil
+// Captures the specified array lists and returns them as a single 2d array.
+// After capturing the values the source lists are reset to new empty arrays.
+func (self *Config) captureLists(lists ...*[]string) [][]string {
+	captures := make([][]string, len(lists))
+	for index, list := range lists {
+		captures[index] = *list
+		*list = []string{}
 	}
 
-	uniqueList := []string{}
-	uniqueElements := map[string]bool{}
+	return captures
+}
 
-	for _, item := range list {
-		uniqueElements[item] = true
-	}
-
-	for _, item := range list {
-		if uniqueElements[item] {
-			uniqueElements[item] = false
-			uniqueList = append(uniqueList, item)
+// Restores the specified lists from a previously captured state if the lists are still empty.
+func (self *Config) restoreListsIfEmpty(captures [][]string, lists ...*[]string) {
+	for index, list := range lists {
+		if len(*list) == 0 {
+			*list = captures[index]
 		}
 	}
-
-	return uniqueList
 }
 
 // Converts the config to a XML string.
