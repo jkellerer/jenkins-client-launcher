@@ -64,7 +64,7 @@ func (self *TempLocationCleaner) cleanTempLocations(config *util.Config, dirsToK
 		util.GOut("temp", "Cleaning expired files in %v", rootDir)
 
 		dirToEmptyMap := map[string]bool{}
-		expiredTime := time.Now().Add(-maxTTLInTempDirectories)
+		expiredTimeOffset := time.Now().Add(-maxTTLInTempDirectories)
 
 		// Handling outdated temporary files
 		filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
@@ -74,8 +74,22 @@ func (self *TempLocationCleaner) cleanTempLocations(config *util.Config, dirsToK
 					if info.IsDir() {
 						dirToEmptyMap[filepath.Clean(path)] = true
 					} else {
-						// TODO: Implement config.CleanTempLocationExclusions
-						if info.ModTime().Before(expiredTime) {
+						fileIsToRemove := true
+
+						if fileIsToRemove && info.ModTime().After(expiredTimeOffset) {
+							fileIsToRemove = false
+						}
+
+						if fileIsToRemove && len(config.CleanTempLocationExclusions) > 0 {
+							for _, pattern := range config.CleanTempLocationExclusions {
+								if matchesExclusionPattern, _ := filepath.Match(pattern, path); matchesExclusionPattern {
+									fileIsToRemove = false
+									break
+								}
+							}
+						}
+
+						if fileIsToRemove {
 							if err := os.Remove(path); err == nil {
 								util.GOut("temp", "Removed expired: %v", path)
 							}
