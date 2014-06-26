@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"net/http"
+	"time"
 )
 
 const (
@@ -48,18 +50,42 @@ func (self *JenkinsClientDownloader) Prepare(config *util.Config) {
 func (self *JenkinsClientDownloader) downloadJar(config *util.Config) error {
 	util.GOut("DOWNLOAD", "Getting latest Jenkins client %v", (config.CIHostURI+"/"+ClientJarURL))
 
-	// TODO: Implement If-Modified-Since
+	// Create the HTTP request.
+	request, err := config.CIRequest("GET", ClientJarURL, nil)
+	if err != nil {
+		return err
+	}
 
-	var source io.ReadCloser
-	if response, err := config.CIGet(ClientJarURL); err == nil && response.StatusCode == 200 {
-		source = response.Body
-		defer source.Close()
-	} else {
-		if err == nil {
-			return fmt.Errorf("Failed downloading jenkins client. Cause: HTTP-%v %v", response.StatusCode, response.Status)
-		} else {
-			return fmt.Errorf("Failed downloading jenkins client. Connect failed. Cause: %v", err)
+	if file, err := os.Open(ClientJarName); err == nil {
+		if fi, err := file.Stat(); err == nil {
+			request.Header.Add("If-Modified-Since", fi.ModTime().Format(http.TimeFormat))
 		}
+
+		file.Close()
+	}
+
+	// Perform the HTTP request.
+	var source io.ReadCloser
+	sourceTime := time.Now()
+	if response, err := config.CIClient().Do(request); err == nil {
+		defer response.Body.Close()
+
+		source = response.Body
+
+		if response.StatusCode == 304 {
+			util.GOut("DOWNLOAD", "Jenkins client is up-to-date, no need to download.")
+			return nil
+		} else if response.StatusCode != 200 {
+			return fmt.Errorf("Failed downloading jenkins client. Cause: HTTP-%v %v", response.StatusCode, response.Status)
+		}
+
+		if value := response.Header.Get("Last-Modified"); value != "" {
+			if time, err := http.ParseTime(value); err == nil {
+				sourceTime = time
+			}
+		}
+	} else {
+		return fmt.Errorf("Failed downloading jenkins client. Connect failed. Cause: %v", err)
 	}
 
 	target, err := os.Create(ClientJarDownloadName); defer target.Close()
@@ -71,7 +97,9 @@ func (self *JenkinsClientDownloader) downloadJar(config *util.Config) error {
 	if _, err = io.Copy(target, source); err == nil {
 		target.Close()
 		if err = os.Remove(ClientJarName); err == nil || os.IsNotExist(err) {
-			err = os.Rename(ClientJarDownloadName, ClientJarName)
+			if err = os.Rename(ClientJarDownloadName, ClientJarName); err == nil {
+				os.Chtimes(ClientJarName, sourceTime, sourceTime)
+			}
 		}
 		return err
 	} else {
