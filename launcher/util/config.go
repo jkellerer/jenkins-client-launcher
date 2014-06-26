@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"io"
 )
 
 // Implemented by types that verify if the configuration is valid for them.
@@ -42,12 +43,24 @@ func (self *ConsoleMonitor) IsRestartTriggered(line string) bool {
 	return false
 }
 
+const (
+	JenkinsConnectionDescription = `
+<ci>
+  Specifies the connection between this node and Jenkins CI server:
+
+  - url:                Is the base address of jenkins, e.g. "http://jenkins-host/jenkins".
+
+  - noCertificateCheck: Toggles whether certificates are verified.
+                        Enabling this option makes HTTPS connections as secure as HTTP connections.
+                        (Use with caution!)
+</ci>
+`)
+
 type JenkinsConnection struct {
-	CIHostURIDescription   string `xml:",comment"`
-	CIHostURI              string `xml:"ci>url"`
-	CIAcceptAnyCert        bool   `xml:"ci>noCertificateCheck"`
-	CIUsername             string `xml:"ci>auth>user"`
-	CIPassword             string `xml:"ci>auth>password"`
+	CIHostURI                    string `xml:"ci>url"`
+	CIAcceptAnyCert              bool   `xml:"ci>noCertificateCheck"`
+	CIUsername                   string `xml:"ci>auth>user"`
+	CIPassword                   string `xml:"ci>auth>password"`
 }
 
 // Returns true if the configuration has a Jenkins url.
@@ -70,30 +83,89 @@ func (self *JenkinsConnection) CIClient() *http.Client {
 	return client
 }
 
-// Issues a HTTP-GET request on Jenkins using the specified request path (= path + query string).
-func (self *JenkinsConnection) CIGet(path string) (*http.Response, error) {
-	request, err := http.NewRequest("GET", fmt.Sprintf("%v/%v", self.CIHostURI, path), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(self.CIUsername) > 0 && len(self.CIPassword) > 0 {
+// Returns a request object which may be used with CIClient to do a HTTP request.
+func (self *JenkinsConnection) CIRequest(method, path string, body io.Reader) (request *http.Request, err error) {
+	request, err = http.NewRequest(method, fmt.Sprintf("%v/%v", self.CIHostURI, path), body)
+	if err == nil && len(self.CIUsername) > 0 && len(self.CIPassword) > 0 {
 		request.SetBasicAuth(self.CIUsername, self.CIPassword)
 	}
-
-	return self.CIClient().Do(request)
+	return
 }
+
+// Issues a HTTP-GET request on Jenkins using the specified request path (= path + query string).
+func (self *JenkinsConnection) CIGet(path string) (*http.Response, error) {
+	if request, err := self.CIRequest("GET", path, nil); err != nil {
+		return nil, err
+	} else {
+		return self.CIClient().Do(request)
+	}
+}
+
+const (
+	SSHServerDescription = `
+<sshServer>
+  Configures the server port of the SSH server (only for run mode 'ssh-server')
+</sshServer>
+`)
 
 type SSHServer struct {
-	SSHListenAddress string `xml:"sshServer>address"`
-	SSHListenPort    uint16 `xml:"sshServer>port"`
-	SSHUsername      string `xml:"sshServer>auth>user"`
-	SSHPassword      string `xml:"sshServer>auth>password"`
+	SSHListenAddress     string `xml:"sshServer>address"`
+	SSHListenPort        uint16 `xml:"sshServer>port"`
+	SSHUsername          string `xml:"sshServer>auth>user"`
+	SSHPassword          string `xml:"sshServer>auth>password"`
 }
 
+const (
+	JavaOptionsDescription = `
+<java>
+  Configures the Java environment that is used to bootstrap the Jenkins Client:
+
+  - args>arg:      Enumerates additional options (each wrapped in one <arg>OPT</arg>) that are used
+                   to start java.
+                   The default options try to optimise GC for low footprint instead of performance in
+                   order to leave more memory for IO and forked build tasks.
+
+  - forceFullGC:   Allows to enable periodic calls to "System.gc()" to reduce the overall memory
+                   usage of the Jenkins Client.
+</java>
+`)
+
 type JavaOptions struct {
-	JavaArgs  []string `xml:"java>args>arg"`
+	JavaArgs                   []string `xml:"java>args>arg"`
+	ForceFullGC                bool     `xml:"java>forceFullGC>enabled"`
+	ForceFullGCOnlyWhenIDLE    bool     `xml:"java>forceFullGC>onlyWhenIdle"`
+	ForceFullGCIntervalMinutes int64    `xml:"java>forceFullGC>interval>minutes"`
 }
+
+const (
+	ClientOptionsDescription = `
+<client>
+  Configures the Jenkins client and runtime behaviour:
+
+  - name:          Is the name of this node. (Defaults to [hostname])
+
+  - secretKey:     The client specific secret key used to communicate with Jenkins.
+                   When empty, JCL will fetch it from Jenkins.
+
+  - passAuth:      Toggles whether CI auth credentials are passed to the Jenkins client.
+
+  - monitoring:    Toggles whether JCL monitors the Jenkins client and restarts it on failure:
+                   - stateOnServer: When enabled JCL watches the node state on Jenkins and
+                                    triggers a restart when the node appears offline.
+                   - console:       When enabled JCL watches the console output and triggers
+                                    a restart when one of the configured error tokens are found.
+
+  - restart:       Controls how restarts of the Jenkins client are triggered.
+                   - handleReconnects:  When enabled let JCL handle reconnects on server outage
+                                        instead of allowing the Jenkins client to handle it by
+                                        itself.
+                   - sleepOnFailure:    Number of seconds to sleep between 2 attempts to restart.
+                                        This sleep time is ramped up (multiplied) with the number
+                                        of restart attempts in a row.
+                   - periodic:          Allows to trigger a restart per interval
+                                        (e.g. once a week).
+</client>
+`)
 
 type ClientOptions struct {
 	ClientName                            string `xml:"client>name"`
@@ -104,22 +176,49 @@ type ClientOptions struct {
 	ClientMonitorConsole                  bool   `xml:"client>monitoring>console>enabled"`
 	HandleReconnectsInLauncher            bool   `xml:"client>restart>handleReconnects"`
 	SleepTimeSecondsBetweenFailures       int64  `xml:"client>restart>sleepOnFailure>seconds"`
+	PeriodicClientRestartEnabled          bool   `xml:"client>restart>periodic>enabled"`
+	PeriodicClientRestartOnlyWhenIDLE     bool   `xml:"client>restart>periodic>onlyWhenIdle"`
+	PeriodicClientRestartIntervalHours    int64  `xml:"client>restart>periodic>interval>hours"`
 }
+
+const (
+	MaintenanceDescription = `
+<maintenance>
+  Configures additional maintenance tasks that JCL can perform to keep the node online:
+
+  - cleanTempLocation:  Toggles whether JCL will clean the temporary folder from files that
+                        haven't been modified for "ttl>hours".
+                        Files can be excluded from cleaning using GLOB style patterns, following
+                        the syntax defined for "http://golang.org/pkg/path/filepath/#Match"
+                        Example:
+                        <exclusions>
+                          <exclusion>*.dll</exclusion>
+                          <exclusion>*\mypath\*</exclusion>
+                        </exclusions>
+</maintenance>
+`)
 
 type Maintenance struct {
 	CleanTempLocation                bool     `xml:"maintenance>cleanTempLocation>enabled"`
+	CleanTempLocationOnlyWhenIDLE    bool     `xml:"maintenance>cleanTempLocation>onlyWhenIdle"`
 	CleanTempLocationIntervalHours   int64    `xml:"maintenance>cleanTempLocation>interval>hours"`
 	CleanTempLocationTTLHours        int64    `xml:"maintenance>cleanTempLocation>ttl>hours"`
 	CleanTempLocationExclusions      []string `xml:"maintenance>cleanTempLocation>exclusions>exclusion"`
 }
 
-type Config struct {
-	NeedsSave    bool      `xml:"-"`
+const (
+	ConfigDescription = `
 
-	XMLName         xml.Name `xml:"config"`
-	RunMode         string   `xml:"runMode,attr"`
-	Autostart       bool     `xml:"autostart,attr"`
-	Comment         string   `xml:",comment"`
+Configuration file for Jenkins Client Launcher (JCL)
+`)
+
+type Config struct {
+	XMLName           xml.Name `xml:"config"`
+	RunMode           string   `xml:"runMode,attr"`
+	Autostart         bool     `xml:"autostart,attr"`
+	ConfigDescription string   `xml:",comment"`
+
+	NeedsSave         bool      `xml:"-"`
 
 	JenkinsConnection
 	ClientOptions
@@ -138,9 +237,13 @@ func NewDefaultConfig() *Config {
 		NeedsSave: true,
 		Autostart: false,
 		RunMode: "client",
-		Comment: "",
+		ConfigDescription: ConfigDescription +
+				JenkinsConnectionDescription +
+				ClientOptionsDescription +
+				JavaOptionsDescription +
+				SSHServerDescription +
+				MaintenanceDescription,
 		JenkinsConnection: JenkinsConnection{
-			CIHostURIDescription: "",
 			CIHostURI: "",
 			CIUsername: "admin", CIPassword: "changeit", CIAcceptAnyCert: false,
 		},
@@ -153,21 +256,26 @@ func NewDefaultConfig() *Config {
 			PassCIAuth: false,
 			HandleReconnectsInLauncher: false,
 			SleepTimeSecondsBetweenFailures: 30,
+			PeriodicClientRestartEnabled: false,
+			PeriodicClientRestartOnlyWhenIDLE: true,
+			PeriodicClientRestartIntervalHours: 48,
 		},
 		JavaOptions: JavaOptions{
 			// Configuring java to spend more time in garbage collection instead of using more memory.
 			// We want the memory for IO cache and other build processes and not to be wasted in unused heap.
-			// TODO: Add support for "jcmd <pid> GC.run" to call GC explicitly on schedule or when the node is known to be IDLE.
 			JavaArgs: []string {
 				"-Xms10m",
-				"-XX:+UseSerialGC",
-				"-XX:GCTimeRatio=5",
-				"-XX:MaxGCPauseMillis=5000",
+				"-XX:GCTimeRatio=6",
+				"-XX:MaxGCPauseMillis=8000",
 				"-XX:MaxGCMinorPauseMillis=333",
-				"-XX:MaxHeapFreeRatio=25",
-				"-XX:MinHeapFreeRatio=10",
-				"-XX:+CMSClassUnloadingEnabled",
+				"-XX:+ClassUnloading",
+				"-XX:+UseParallelOldGC",
+				"-XX:+UseParallelOldGCCompacting",
+				"-XX:+UseMaximumCompactionOnSystemGC",
 			},
+			ForceFullGC: true,
+			ForceFullGCOnlyWhenIDLE: true,
+			ForceFullGCIntervalMinutes: 5,
 		},
 		SSHServer: SSHServer{
 			SSHListenAddress: "0.0.0.0",
@@ -185,6 +293,7 @@ func NewDefaultConfig() *Config {
 		},
 		Maintenance: Maintenance{
 			CleanTempLocation: true,
+			CleanTempLocationOnlyWhenIDLE: true,
 			CleanTempLocationIntervalHours: 4,
 			CleanTempLocationTTLHours: 24,
 		},
