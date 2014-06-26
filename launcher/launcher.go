@@ -106,6 +106,8 @@ Options:
 
 	timeOfLastStart := time.Now()
 
+	go ListenForKeyboardInput(config)
+
 	for modes.RunConfiguredMode(config) {
 		fmt.Print("\n:::::::::::::::::::::::::::::::::\n")
 		fmt.Print("::  Restarting Jenkins Client  ::")
@@ -122,6 +124,24 @@ Options:
 
 		restartCount++
 		timeOfLastStart = time.Now()
+	}
+}
+
+// Listens for key codes.
+func ListenForKeyboardInput(config *util.Config) {
+	var keyCode = make([]byte, 1)
+	util.Out("Listening for keys: [D+Return]: Print Stacktrace | [R+Return]: Restart client.")
+	for {
+		if n, err := os.Stdin.Read(keyCode); err == nil && n == 1 {
+			switch keyCode[0] {
+			case 'r', 'R':
+				modes.GetConfiguredMode(config).Stop()
+			case 'd', 'D':
+				util.PrintAllStackTraces()
+			}
+		} else {
+			return
+		}
 	}
 }
 

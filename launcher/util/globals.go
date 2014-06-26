@@ -3,7 +3,11 @@
 
 package util
 
-import "sync"
+import (
+	"os"
+	"runtime/pprof"
+	"sync"
+)
 
 // Points to the absolute path of the Jenkins client jar.
 var ClientJar = ""
@@ -17,6 +21,11 @@ var Java = ""
 
 // Contains an address (HOST:PORT) which mirrors the Jenkins client server port.
 var TransportTunnelAddress = ""
+
+// Prints stack traces of all go routines.
+func PrintAllStackTraces() {
+	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+}
 
 // Thread save boolean value.
 type AtomicBoolean struct {
@@ -39,7 +48,6 @@ func (self *AtomicBoolean) Get() bool {
 	self.mutex.Lock(); defer self.mutex.Unlock()
 	return self.value
 }
-
 
 // Thread save boolean value.
 type AtomicInt32 struct {
