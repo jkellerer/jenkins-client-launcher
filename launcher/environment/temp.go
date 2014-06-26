@@ -49,7 +49,10 @@ func (self *TempLocationCleaner) Prepare(config *util.Config) {
 
 	go func() {
 		dirsToKeepClean := []string{os.TempDir()}
+		// Wait 5 minutes before clearing temp folders (let the client run first).
+		time.Sleep(time.Minute * 5)
 		// Run first
+		self.waitForIdleIfRequired(config)
 		self.cleanTempLocations(config, dirsToKeepClean)
 		// Run in schedule
 		for time := range self.ticker.C {
