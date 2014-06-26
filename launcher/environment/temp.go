@@ -54,9 +54,19 @@ func (self *TempLocationCleaner) Prepare(config *util.Config) {
 		// Run in schedule
 		for time := range self.ticker.C {
 			util.GOut("temp", "Looking after temp locations at %v", time)
+			self.waitForIdleIfRequired(config)
 			self.cleanTempLocations(config, dirsToKeepClean)
 		}
 	}()
+}
+
+func (self *TempLocationCleaner) waitForIdleIfRequired(config *util.Config) {
+	if config.CleanTempLocationOnlyWhenIDLE {
+		for !util.NodeIsIdle.Get() {
+			util.GOut("temp", "Waiting for node to become IDLE before cleaning temp locations.")
+			time.Sleep(time.Minute * 5)
+		}
+	}
 }
 
 func (self *TempLocationCleaner) cleanTempLocations(config *util.Config, dirsToKeepClean []string) {
