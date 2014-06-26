@@ -28,7 +28,7 @@ util.ConfigVerifier
 	// Returns the name of the mode.
 	Name() (string)
 	// Returns the status of the mode.
-	Status() (int32)
+	Status() (*util.AtomicInt32)
 	// Start the mode and returns after the mode has been started.
 	Start(config *util.Config) (error)
 	// Stops the mode.
@@ -94,7 +94,7 @@ func RunConfiguredMode(config *util.Config) bool {
 		sig := <-signals // This channel receives only Interrupt or Kill and blocks until one is received.
 		util.Out("Received signal: %v, stopping...", sig)
 		exitRequested <- true
-		if executableMode.Status() != ModeStopped {
+		if executableMode.Status().Get() != ModeStopped {
 			executableMode.Stop()
 		}
 	}()
@@ -102,8 +102,8 @@ func RunConfiguredMode(config *util.Config) bool {
 	util.Out("STARTED mode %v", executableMode.Name())
 
 	// Waiting for the run mode to stop
-	for executableMode.Status() != ModeStopped {
-		time.Sleep(100)
+	for executableMode.Status().Get() != ModeStopped {
+		time.Sleep(time.Millisecond * 100)
 	}
 	exitRequested <- false
 	signals <- os.Interrupt

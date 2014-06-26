@@ -54,7 +54,7 @@ type JenkinsNodeMonitor struct {
 
 func (self *JenkinsNodeMonitor) IsConfigAcceptable(config *util.Config) (bool) {
 	if config.ClientMonitorStateOnServer && !config.HasCIConnection() {
-		util.GOut(self.Name(), "No Jenkins URI defined. Cannot monitor this node within Jenkins.");
+		util.GOut("monitor", "No Jenkins URI defined. Cannot monitor this node within Jenkins.");
 		return false;
 	}
 	return true;
@@ -113,12 +113,14 @@ func (self *JenkinsNodeMonitor) monitor(config *util.Config) {
 
 // Checks if the run mode is in started state.
 func (self *JenkinsNodeMonitor) isThisSideConnected(config *util.Config) bool {
-	return modes.GetConfiguredMode(config).Status() == modes.ModeStarted
+	return modes.GetConfiguredMode(config).Status().Get() == modes.ModeStarted
 }
 
 // Checks if Jenkins shows this node as connected.
+// Also updates the global "util.NodeIsIdle" state.
 func (self *JenkinsNodeMonitor) isServerSideConnected(config *util.Config) bool {
 	if status, err := GetJenkinsNodeStatus(config); err == nil {
+		util.NodeIsIdle.Set(status.Idle)
 		return !status.Offline
 	} else {
 		util.GOut("monitor", "Failed to monitor node %v using %v. Cause: %v", config.ClientName, config.CIHostURI, err)

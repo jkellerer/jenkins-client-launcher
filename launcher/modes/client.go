@@ -49,14 +49,20 @@ import (
 **/
 
 type ClientMode struct {
-	status int32
+	status *util.AtomicInt32
+}
+
+func NewClientMode() *ClientMode {
+	r := new(ClientMode)
+	r.status = new(util.AtomicInt32)
+	return r
 }
 
 func (self *ClientMode) Name() (string) {
 	return "client"
 }
 
-func (self *ClientMode) Status() (int32) {
+func (self *ClientMode) Status() *util.AtomicInt32 {
 	return self.status
 }
 
@@ -81,7 +87,7 @@ func (self *ClientMode) Start(config *util.Config) (error) {
 		panic(fmt.Sprintf("Cannot start mode whose state is != ModeNone && != ModeStopped, was %v", self.status))
 	}
 
-	self.status = ModeStarting
+	self.status.Set(ModeStarting)
 	go self.execute(config)
 
 	return nil
@@ -89,12 +95,12 @@ func (self *ClientMode) Start(config *util.Config) (error) {
 
 func (self *ClientMode) Stop() {
 	if !self.isStopped() {
-		self.status = ModeStopping
+		self.status.Set(ModeStopping)
 	}
 }
 
 func (self *ClientMode) isStopped() bool {
-	return self.status == ModeNone || self.status == ModeStopped
+	return self.status.Get() == ModeNone || self.status.Get() == ModeStopped
 }
 
 func (self *ClientMode) execute(config *util.Config) {
@@ -151,7 +157,7 @@ func (self *ClientMode) execute(config *util.Config) {
 			go func() {
 				<-stoppingClient
 				command.Process.Kill()
-				time.Sleep(500)
+				time.Sleep(time.Second * 1)
 			}()
 
 			if err := command.Wait(); err != nil {
@@ -160,22 +166,22 @@ func (self *ClientMode) execute(config *util.Config) {
 				util.GOut("client", "Jenkins client was stopped.")
 			}
 
-			self.status = ModeStopped
+			self.status.Set(ModeStopped)
 			clientStopped<-true
 		}
 	}()
 
 	// Entering main loop
-	self.status = ModeStarted
+	self.status.Set(ModeStarted)
 
-	for self.status == ModeStarted {
-		time.Sleep(100)
+	for self.status.Get() == ModeStarted {
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	stoppingClient <- true
 	<-clientStopped
 
-	self.status = ModeStopped
+	self.status.Set(ModeStopped)
 }
 
 func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.ReadCloser, output io.Writer) {
@@ -196,7 +202,7 @@ func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.Read
 			if config.ClientMonitorConsole && config.ConsoleMonitor.IsRestartTriggered(string(line)) {
 				util.GOut("client", "RESTART TOKEN found. Client state may be invalid, forcing a restart.")
 				go func() {
-					time.Sleep(1000)
+					time.Sleep(time.Second * 1)
 					self.Stop()
 				}()
 			}
@@ -231,4 +237,4 @@ func (self *ClientMode) extractSecret(content []byte) string {
 }
 
 // Registering the client mode.
-var _ = RegisterMode(new(ClientMode))
+var _ = RegisterMode(NewClientMode())

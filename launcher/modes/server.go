@@ -15,15 +15,21 @@ import (
 )
 
 type ServerMode struct {
-	status int32
+	status *util.AtomicInt32
 	config *util.Config
+}
+
+func NewServerMode() *ServerMode {
+	r := new(ServerMode)
+	r.status = util.NewAtomicInt32()
+	return r
 }
 
 func (self *ServerMode) Name() (string) {
 	return "ssh-server"
 }
 
-func (self *ServerMode) Status() (int32) {
+func (self *ServerMode) Status() (*util.AtomicInt32) {
 	return self.status
 }
 
@@ -33,12 +39,12 @@ func (self *ServerMode) IsConfigAcceptable(config *util.Config) (bool) {
 }
 
 func (self *ServerMode) Start(config *util.Config) (error) {
-	if self.status != ModeNone {
+	if self.status.Get() != ModeNone {
 		panic("Cannot start mode whose state is != ModeNone")
 	}
 
 	self.config = config;
-	self.status = ModeStarting
+	self.status.Set(ModeStarting)
 
 	var keySearchPaths = []string {
 		"id_rsa",
@@ -73,7 +79,7 @@ func (self *ServerMode) Start(config *util.Config) (error) {
 }
 
 func (self *ServerMode) Stop() {
-	self.status = ModeStopping
+	self.status.Set(ModeStopping)
 }
 
 func (self *ServerMode) createPrivateKey(privateKeyFile string) (*ssh.Signer, error) {
@@ -97,7 +103,7 @@ func (self *ServerMode) execute(privateKey ssh.Signer) {
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 			// Slowing down password check to make BF attacks more difficult.
-			time.Sleep(1000)
+			time.Sleep(time.Second * 1)
 
 			if c.User() == self.config.SSHUsername && string(pass) == self.config.SSHPassword {
 				return nil, nil
@@ -128,7 +134,7 @@ func (self *ServerMode) execute(privateKey ssh.Signer) {
 	} else {
 		defer func() {
 			listener.Close()
-			self.status = ModeStopped
+			self.status.Set(ModeStopped)
 		}()
 	}
 
@@ -146,9 +152,9 @@ func (self *ServerMode) execute(privateKey ssh.Signer) {
 	}()
 
 	// Entering main loop and remain there until the terminal is stopped and the deferred channel close is triggered.
-	self.status = ModeStarted
-	for self.status == ModeStarted {
-		time.Sleep(100)
+	self.status.Set(ModeStarted)
+	for self.status.Get() == ModeStarted {
+		time.Sleep(time.Millisecond * 100)
 	}
 }
 
@@ -213,4 +219,4 @@ func (self *ServerMode) handleSSHRequest(connection *net.Conn, config *ssh.Serve
 }
 
 // Registering the server mode.
-var _ = RegisterMode(new(ServerMode))
+var _ = RegisterMode(NewServerMode())
