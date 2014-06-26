@@ -265,9 +265,7 @@ func NewDefaultConfig() *Config {
 			// We want the memory for IO cache and other build processes and not to be wasted in unused heap.
 			JavaArgs: []string {
 				"-Xms10m",
-				"-XX:GCTimeRatio=6",
-				"-XX:MaxGCPauseMillis=8000",
-				"-XX:MaxGCMinorPauseMillis=333",
+				"-XX:GCTimeRatio=8",
 				"-XX:+ClassUnloading",
 				"-XX:+UseParallelOldGC",
 				"-XX:+UseParallelOldGCCompacting",
@@ -295,7 +293,7 @@ func NewDefaultConfig() *Config {
 			CleanTempLocation: true,
 			CleanTempLocationOnlyWhenIDLE: true,
 			CleanTempLocationIntervalHours: 4,
-			CleanTempLocationTTLHours: 24,
+			CleanTempLocationTTLHours: 48,
 		},
 	}
 
