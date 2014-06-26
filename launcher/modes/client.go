@@ -216,14 +216,23 @@ func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.Read
 
 func (self *ClientMode) getSecretFromJenkins(config *util.Config) string {
 	response, err := config.CIGet(fmt.Sprintf("computer/%s/", config.ClientName))
-	if err == nil && response.StatusCode == 200 {
-		content, err := ioutil.ReadAll(response.Body)
-		if (err == nil) {
-			return self.extractSecret(content)
+	if err == nil {
+		defer response.Body.Close()
+
+		if response.StatusCode == 200 {
+			var content []byte
+			if content, err = ioutil.ReadAll(response.Body); err == nil {
+				return self.extractSecret(content)
+			}
+		} else {
+			util.GOut("client", "Failed fetching secret key from Jenkins. Cause: %v", response.Status)
 		}
-	} else {
+	}
+
+	if err != nil {
 		util.GOut("client", "Failed fetching secret key from Jenkins. Cause: %v", err)
 	}
+
 	return ""
 }
 

@@ -72,12 +72,14 @@ func (self *FullGCInvoker) invokeSystemGC(config *util.Config) {
 	// curl -d "script=System.gc()" -X POST http://user:password@jenkins-host/ci/computer/%s/scriptText
 	postBody := strings.NewReader(fmt.Sprintf(FullGCPostBody, url.QueryEscape(FullGCScript)))
 	request, err := config.CIRequest("POST", fmt.Sprintf(FullGCURL, config.ClientName), postBody)
-	if (err == nil) {
-		response, err := config.CIClient().Do(request)
-		if err != nil {
+	if err == nil {
+		if response, err := config.CIClient().Do(request); err == nil {
+			response.Body.Close()
+			if response.StatusCode != 200 {
+				util.GOut("gc", "Failed invoking full GC as node request in Jenkins failed with %s", response.Status)
+			}
+		} else {
 			util.GOut("gc", "Failed invoking full GC as Jenkins cannot be contacted. Cause: %v", err)
-		} else if response.StatusCode != 200 {
-			util.GOut("gc", "Failed invoking full GC as node request in Jenkins failed with %s", response.Status)
 		}
 	}
 }
