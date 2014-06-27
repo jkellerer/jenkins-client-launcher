@@ -7,21 +7,30 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
-	"github.com/jkellerer/jenkins-client-launcher/launcher/modes"
-	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
-	"github.com/jkellerer/jenkins-client-launcher/launcher/environment"
 	"fmt"
 	"regexp"
 	"net/http"
 	"io"
 	"time"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/modes"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
+	"github.com/jkellerer/jenkins-client-launcher/launcher/environment"
 )
 
 const (
-	AppName    = "Jenkins Client Launcher"
-	AppVersion = "0.1"
-	ConfigName = "launcher.config"
-)
+	ConfigName     = "launcher.config"
+	AppName        = "Jenkins Client Launcher"
+	AppVersion     = "0.1"
+	AppDescription = `
+This application attempts to provide a stable runtime environment for a Jenkins client.
+Regardless of the run mode, clients are started in 'user-mode' inheriting user & environment of the caller.
+Functionality is controlled via CLI options and '%s' which is created in the current working directory when missing.
+
+Usage %s [options]
+
+Options:
+
+`)
 
 // Is the applications main run loop.
 func Run() {
@@ -77,16 +86,7 @@ func Run() {
 
 	if *help {
 		saveConfigIfRequired()
-		fmt.Printf(`
-This application attempts to provide a stable runtime environment for a Jenkins client.
-Regardless of the run mode, clients are started in 'user-mode' inheriting user & environment of the caller.
-Functionality is controlled via CLI options and '`+ConfigName+`' which is created in the current working directory when missing.
-
-Usage %s [options]
-
-Options:
-
-`, filepath.Base(os.Args[0]))
+		fmt.Printf(AppDescription, ConfigName, filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 		return
 	}
