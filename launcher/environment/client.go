@@ -56,12 +56,8 @@ func (self *JenkinsClientDownloader) downloadJar(config *util.Config) error {
 		return err
 	}
 
-	if file, err := os.Open(ClientJarName); err == nil {
-		if fi, err := file.Stat(); err == nil {
-			request.Header.Add("If-Modified-Since", fi.ModTime().Format(http.TimeFormat))
-		}
-
-		file.Close()
+	if fi, err := os.Stat(ClientJarName); err == nil {
+		request.Header.Add("If-Modified-Since", fi.ModTime().Format(http.TimeFormat))
 	}
 
 	// Perform the HTTP request.

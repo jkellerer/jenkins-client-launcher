@@ -341,20 +341,16 @@ func NewConfig(fileName string) *Config {
 	defer file.Close()
 
 	if err == nil {
-		fileInfo, err := file.Stat()
+		Out("Loading configuration from %v", fileName)
 
-		if err == nil && !fileInfo.IsDir() {
-			Out("Loading configuration from %v", fileName)
+		lists := []*[]string {&config.CleanTempLocationExclusions, &config.RestartTriggerTokens, &config.JavaArgs}
+		captures := config.captureLists(lists...)
 
-			lists := []*[]string {&config.CleanTempLocationExclusions, &config.RestartTriggerTokens, &config.JavaArgs}
-			captures := config.captureLists(lists...)
-
-			if err := xml.NewDecoder(file).Decode(config); err == nil {
-				config.NeedsSave = false;
-			}
-
-			config.restoreListsIfEmpty(captures, lists...)
+		if err = xml.NewDecoder(file).Decode(config); err == nil {
+			config.NeedsSave = false;
 		}
+
+		config.restoreListsIfEmpty(captures, lists...)
 	}
 
 	if err != nil {

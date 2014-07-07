@@ -16,7 +16,7 @@ const (
 )
 
 // The interval when the jenkins node is monitored.
-var nodeMonitoringInterval = time.Minute * 3
+var nodeMonitoringInterval = time.Minute * 2
 
 // The max number of offline results in a row until a reconnect is forced.
 var maxOfflineCountBeforeRestart = int16(2)
