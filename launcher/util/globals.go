@@ -19,6 +19,9 @@ var NodeIsIdle = NewAtomicBoolean()
 // Points to the absolute path of the Java executable.
 var Java = ""
 
+// Contains additional java args that are added before the configured java args.
+var JavaArgs = []string{}
+
 // Contains an address (HOST:PORT) which mirrors the Jenkins client server port.
 var TransportTunnelAddress = ""
 

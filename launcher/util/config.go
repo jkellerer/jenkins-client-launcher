@@ -209,6 +209,8 @@ type ClientOptions struct {
 	PeriodicClientRestartEnabled          bool   `xml:"client>restart>periodic>enabled"`
 	PeriodicClientRestartOnlyWhenIDLE     bool   `xml:"client>restart>periodic>onlyWhenIdle"`
 	PeriodicClientRestartIntervalHours    int64  `xml:"client>restart>periodic>interval>hours"`
+	OutOfMemoryRestartEnabled             bool   `xml:"client>restart>outOfMemory>enabled"`
+	OutOfMemoryRestartOnlyWhenIDLE        bool   `xml:"client>restart>outOfMemory>onlyWhenIdle"`
 }
 
 const (
@@ -289,6 +291,8 @@ func NewDefaultConfig() *Config {
 			PeriodicClientRestartEnabled: false,
 			PeriodicClientRestartOnlyWhenIDLE: true,
 			PeriodicClientRestartIntervalHours: 48,
+			OutOfMemoryRestartEnabled: true,
+			OutOfMemoryRestartOnlyWhenIDLE: true,
 		},
 		JavaOptions: JavaOptions{
 			// Configuring java to spend more time in garbage collection instead of using more memory.
@@ -297,8 +301,6 @@ func NewDefaultConfig() *Config {
 				"-Xms10m",
 				"-XX:GCTimeRatio=8",
 				"-XX:+ClassUnloading",
-				"-XX:+UseParallelOldGC",
-				"-XX:+UseParallelOldGCCompacting",
 				"-XX:+UseMaximumCompactionOnSystemGC",
 			},
 			ForceFullGC: true,

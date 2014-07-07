@@ -105,6 +105,7 @@ func (self *ClientMode) isStopped() bool {
 
 func (self *ClientMode) execute(config *util.Config) {
 	commandline := []string{}
+	commandline = append(commandline, util.JavaArgs...)
 	commandline = append(commandline, config.JavaArgs...)
 	commandline = append(commandline,
 		"-jar", util.ClientJar,
