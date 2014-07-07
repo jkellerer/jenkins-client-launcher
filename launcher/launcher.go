@@ -47,6 +47,7 @@ func Run() {
 
 	url := flag.String("url", "", "Specifies the URL to Jenkins server if not already set inside '"+ConfigName+"'.")
 	name := flag.String("name", "", "Specifies the name of this node in Jenkins (defaults to [hostname] if not specified).")
+	create := flag.Bool("create", false, "Enables the auto creation of a Jenkins node if it is missing.")
 	secretKey := flag.String("secret", "", "Specifies the secret key to use in client mode when starting the Jenkins client.")
 	acceptAnyCert := flag.Bool("anyCert", false, "Disabled cert verification for TLS connections with Jenkins (this is not secure at all).")
 
@@ -76,6 +77,7 @@ func Run() {
 	if len(*url) > 0 { config.CIHostURI = *url }
 	if len(*secretKey) > 0 { config.SecretKey = *secretKey }
 	if len(*name) > 0 { config.ClientName = *name }
+	if *create { config.CreateClientIfMissing = true }
 	if *acceptAnyCert { config.CIAcceptAnyCert = true }
 
 	saveConfigIfRequired := func() {

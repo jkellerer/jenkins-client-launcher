@@ -201,6 +201,7 @@ type ClientOptions struct {
 	ClientName                            string `xml:"client>name"`
 	SecretKey                             string `xml:"client>secretKey"`
 	PassCIAuth                            bool   `xml:"client>passAuth"`
+	CreateClientIfMissing                 bool   `xml:"client>createIfMissing"`
 	ClientMonitorStateOnServer            bool   `xml:"client>monitoring>stateOnServer>enabled"`
 	ClientMonitorStateOnServerMaxFailures int16  `xml:"client>monitoring>stateOnServer>maxFailures"`
 	ClientMonitorConsole                  bool   `xml:"client>monitoring>console>enabled"`
@@ -286,6 +287,7 @@ func NewDefaultConfig() *Config {
 			ClientMonitorConsole: true,
 			SecretKey: "",
 			PassCIAuth: false,
+			CreateClientIfMissing: false,
 			HandleReconnectsInLauncher: false,
 			SleepTimeSecondsBetweenFailures: 30,
 			PeriodicClientRestartEnabled: false,
