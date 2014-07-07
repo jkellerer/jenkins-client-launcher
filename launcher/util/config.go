@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"io"
+	"io/ioutil"
 )
 
 // Implemented by types that verify if the configuration is valid for them.
@@ -57,10 +58,12 @@ const (
 `)
 
 type JenkinsConnection struct {
-	CIHostURI                    string `xml:"ci>url"`
-	CIAcceptAnyCert              bool   `xml:"ci>noCertificateCheck"`
-	CIUsername                   string `xml:"ci>auth>user"`
-	CIPassword                   string `xml:"ci>auth>password"`
+	CIHostURI        string `xml:"ci>url"`
+	CIAcceptAnyCert  bool   `xml:"ci>noCertificateCheck"`
+	CIUsername       string `xml:"ci>auth>user"`
+	CIPassword       string `xml:"ci>auth>password"`
+	ciCrumbHeader    string `xml:"-"`
+	ciCrumbValue     string `xml:"-"`
 }
 
 // Returns true if the configuration has a Jenkins url.
@@ -85,10 +88,37 @@ func (self *JenkinsConnection) CIClient() *http.Client {
 
 // Returns a request object which may be used with CIClient to do a HTTP request.
 func (self *JenkinsConnection) CIRequest(method, path string, body io.Reader) (request *http.Request, err error) {
-	request, err = http.NewRequest(method, fmt.Sprintf("%v/%v", self.CIHostURI, path), body)
-	if err == nil && len(self.CIUsername) > 0 && len(self.CIPassword) > 0 {
+	if request, err = http.NewRequest(method, fmt.Sprintf("%v/%v", self.CIHostURI, path), body); err != nil {
+		return
+	}
+
+	// Add support for basic auth
+	if len(self.CIUsername) > 0 && len(self.CIPassword) > 0 {
 		request.SetBasicAuth(self.CIUsername, self.CIPassword)
 	}
+
+	// Add support for cross site forgery protected Jenkins instances.
+	if !strings.EqualFold(method, "GET") {
+		if self.ciCrumbHeader == "" {
+			self.ciCrumbHeader = "-"
+			if response, err := self.CIGet("/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"); err == nil {
+				defer response.Body.Close()
+				if response.StatusCode == 200 {
+					if content, err := ioutil.ReadAll(response.Body); err == nil {
+						if v := strings.SplitN(string(content), ":", 2); len(v) == 2 {
+							self.ciCrumbHeader, self.ciCrumbValue = v[0], v[1]
+							GOut("Security", "%s: %s", self.ciCrumbHeader, self.ciCrumbValue)
+						}
+					}
+				}
+			}
+		}
+
+		if self.ciCrumbHeader != "-" {
+			request.Header.Set(self.ciCrumbHeader, self.ciCrumbValue)
+		}
+	}
+
 	return
 }
 
