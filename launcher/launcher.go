@@ -61,13 +61,13 @@ func Run() {
 	flag.CommandLine.SetOutput(os.Stdout)
 	flag.Parse()
 
-	wd, _ := os.Getwd()
-	if len(*dir) > 0 && *dir != wd {
-		util.Out("Changing working directory to %v", *dir)
-		if err := os.Chdir(*dir); err != nil {
-			wd, _ = os.Getwd()
-			panic(fmt.Sprintf("Failed changing working directory, stopping here to prevent any damage. Cause: %v ; CWD is %v", err, wd))
-		}
+	handleWorkingDirectory(*dir)
+
+	if alreadyRunning := CheckIfAlreadyRunning(); alreadyRunning {
+		util.Out("Another launcher is already running with the same configuration. Exiting...")
+		return
+	} else {
+		defer alreadyRunning.Close()
 	}
 
 	config := loadConfig(*defaultConfig, *overwrite)
@@ -141,6 +141,18 @@ func ListenForKeyboardInput(config *util.Config) {
 			}
 		} else {
 			return
+		}
+	}
+}
+
+// Handles the working directory that is used.
+func handleWorkingDirectory(dir string) {
+	wd, _ := os.Getwd()
+	if len(dir) > 0 && dir != wd {
+		util.Out("Changing working directory to %v", dir)
+		if err := os.Chdir(dir); err != nil {
+			wd, _ = os.Getwd()
+			panic(fmt.Sprintf("Failed changing working directory, stopping here to prevent any damage. Cause: %v ; CWD is %v", err, wd))
 		}
 	}
 }
