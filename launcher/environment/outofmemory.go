@@ -7,6 +7,8 @@ import (
 	"time"
 	"sync"
 	"fmt"
+	"os"
+	"path/filepath"
 	"github.com/jkellerer/jenkins-client-launcher/launcher/modes"
 	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
 )
@@ -16,6 +18,7 @@ type OutOfMemoryErrorRestarter struct {
 	util.AnyConfigAcceptor
 	once *sync.Once
 	ticker *time.Ticker
+	outOfMemoryErrorMarker string
 }
 
 func NewOutOfMemoryErrorRestarter() *OutOfMemoryErrorRestarter {
@@ -35,7 +38,15 @@ func (self *OutOfMemoryErrorRestarter) Prepare(config *util.Config) {
 
 	// Make sure this code runs only once.
 	self.once.Do(func() {
+		cwd, _ := os.Getwd()
+		self.outOfMemoryErrorMarker = filepath.Join(cwd, ".oom-restart")
+
 		util.JavaArgs = append(util.JavaArgs, fmt.Sprintf("-XX:OnOutOfMemoryError=%s", self.createOOMErrorTriggerCommand()))
+
+		// Clearing OOM state when mode status is changing.
+		modes.RegisterModeListener(func(mode modes.ExecutableMode, nextStatus int32, config *util.Config) {
+			self.oomErrorTriggered()
+		})
 
 		self.ticker = time.NewTicker(time.Second*5)
 
@@ -60,6 +71,17 @@ func (self *OutOfMemoryErrorRestarter) waitForIdleIfRequired(config *util.Config
 			time.Sleep(time.Minute * 5)
 		}
 	}
+}
+
+// Returns true if a OOM error triggered a restart and resets the error state to false.
+// Executing this method multiple times when OOM error was triggered returns true first and false
+// with every subsequent call until the error is triggered again.
+func (self *OutOfMemoryErrorRestarter) oomErrorTriggered() bool {
+	if fi, err := os.Stat(self.outOfMemoryErrorMarker); err == nil && !fi.IsDir() {
+		os.Remove(self.outOfMemoryErrorMarker)
+		return true
+	}
+	return false
 }
 
 // Registering the restarter.
