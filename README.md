@@ -12,11 +12,12 @@ Features
 
 - Bootstrap the Jenkins client and keep it running.
 - Autostart with the OS.
+- Register nodes in Jenkins if missing.
 - Config file driven with support for centralized configuration.
 - Prepare & maintain the environment:
 	- Keep Jenkins client up-to-date.
 	- Install Java if required.
-	- Clean temporary folders.
+	- Remove outdated temporary files and workspaces.
 - Monitoring with restart on failure:
 	- Detect client crash e.g. OutOfMemory.
 	- Detect remote offline state of the node by querying Jenkins server.
@@ -27,7 +28,6 @@ Limitations / Roadmap / Wishlist
 - More tests
 - SSH tunnel support (connect to Jenkins over SSH)
 - SSH server mode (allow connections from Jenkins)
-- Register new nodes automatically (using the Jenkins API)
 
 
 Usage
