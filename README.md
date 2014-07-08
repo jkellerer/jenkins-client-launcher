@@ -12,11 +12,12 @@ Features
 
 - Bootstrap the Jenkins client and keep it running.
 - Autostart with the OS.
+- Register nodes in Jenkins if missing.
 - Config file driven with support for centralized configuration.
 - Prepare & maintain the environment:
 	- Keep Jenkins client up-to-date.
 	- Install Java if required.
-	- Clean temporary folders.
+	- Remove outdated temporary files and workspaces.
 - Monitoring with restart on failure:
 	- Detect client crash e.g. OutOfMemory.
 	- Detect remote offline state of the node by querying Jenkins server.
@@ -27,7 +28,6 @@ Limitations / Roadmap / Wishlist
 - More tests
 - SSH tunnel support (connect to Jenkins over SSH)
 - SSH server mode (allow connections from Jenkins)
-- Register new nodes automatically (using the Jenkins API)
 
 
 Usage
@@ -83,12 +83,14 @@ in order to let autostart run the launcher.
 
 ###Note on Jenkins Setup
 
-The currently implemented run mode **client** requires the manual creation of a _Dumb Slave_ in Jenkins using the following settings:
+The run mode **client** requires the creation of a _Dumb Slave_ in Jenkins using the following settings:
 
 Parameter             | Value
 ----------------------|-----------------------------
 Name                  | **name-of-your-node** _(preferably the `hostname` of the computer as otherwise it has to be specified with `launcher -name=some-other-name`)_
-Launch method         | **Launch slave agents via Java Web Start**
+Launch method         | **Launch slave agents via Java Web Start** (JNLP)
+
+_Hint:_ Adding `-create` to the commandline enables auto creation of the node inside Jenkins, should it be missing.
 
 Building
 --------
