@@ -13,6 +13,8 @@ import (
 	"strings"
 	"io"
 	"io/ioutil"
+	"path/filepath"
+	"reflect"
 )
 
 // Implemented by types that verify if the configuration is valid for them.
@@ -219,24 +221,50 @@ const (
 <maintenance>
   Configures additional maintenance tasks that JCL can perform to keep the node online:
 
-  - cleanTempLocation:  Toggles whether JCL will clean the temporary folder from files that
-                        haven't been modified for "ttl>hours".
-                        Files can be excluded from cleaning using GLOB style patterns, following
-                        the syntax defined for "http://golang.org/pkg/path/filepath/#Match"
-                        Example:
-                        <exclusions>
-                          <exclusion>*.dll</exclusion>
-                          <exclusion>*\mypath\*</exclusion>
-                        </exclusions>
+  - cleanup:   Toggles whether JCL will clean specified "cleanup>location" from files that
+               haven't been modified for "ttl>hours".
+
+               Location: Envionment variables (in ${var} format) and asterisk symbols
+               are allowed inside the specified location.
+               The special variable "${workspace}" references the workspace folder of this
+               Jenkins node.
+
+               Mode: This value controls how the specified TTL is applied:
+                - TTLPerFile: Cleans every file that exceeds the TTL.
+                - TTLPerLocation: Cleans the location only when all files exceed the TTL.
+
+               Exclusions: Files can be excluded from cleaning using GLOB style patterns,
+               following the syntax defined for "http://golang.org/pkg/path/filepath/#Match".
+
+               Example "Cleanup Temp Location":
+
+                 <cleanup>
+                   <enabled>true</enabled>
+                   <location>${temp}</location>
+                   <onlyWhenIdle>true</onlyWhenIdle>
+                   <interval><hours>4</hours></interval>
+                   <ttl><hours>72</hours></ttl>
+                   <mode>TTLPerFile</mode>
+                   <exclusions>
+                     <exclusion>*.dll</exclusion>
+                     <exclusion>*\mypath\*</exclusion>
+                   </exclusions>
+                 </cleanup>
 </maintenance>
 `)
 
 type Maintenance struct {
-	CleanTempLocation                bool     `xml:"maintenance>cleanTempLocation>enabled"`
-	CleanTempLocationOnlyWhenIDLE    bool     `xml:"maintenance>cleanTempLocation>onlyWhenIdle"`
-	CleanTempLocationIntervalHours   int64    `xml:"maintenance>cleanTempLocation>interval>hours"`
-	CleanTempLocationTTLHours        int64    `xml:"maintenance>cleanTempLocation>ttl>hours"`
-	CleanTempLocationExclusions      []string `xml:"maintenance>cleanTempLocation>exclusions>exclusion"`
+	CleanupSettingsList    []CleanupSettings `xml:"maintenance>cleanup"`
+}
+
+type CleanupSettings struct {
+	Enabled         bool     `xml:"enabled"`
+	Location        string   `xml:"location"`
+	OnlyWhenIDLE    bool     `xml:"onlyWhenIdle"`
+	IntervalHours   int64    `xml:"interval>hours"`
+	TTLHours        int64    `xml:"ttl>hours"`
+	Mode            string   `xml:"mode"`
+	Exclusions      []string `xml:"exclusions>exclusion"`
 }
 
 const (
@@ -324,14 +352,31 @@ func NewDefaultConfig() *Config {
 			},
 		},
 		Maintenance: Maintenance{
-			CleanTempLocation: true,
-			CleanTempLocationOnlyWhenIDLE: true,
-			CleanTempLocationIntervalHours: 4,
-			CleanTempLocationTTLHours: 48,
+			CleanupSettingsList: []CleanupSettings{
+				CleanupSettings{
+					Enabled: true,
+					Location: "${TEMP}",
+					OnlyWhenIDLE:true,
+					IntervalHours: 4,
+					TTLHours: 24 * 2,
+					Mode: "TTLPerFile",
+				},
+				CleanupSettings{
+					Enabled: false,
+					Location: filepath.Join("${WORKSPACE}", "*"),
+					OnlyWhenIDLE:true,
+					IntervalHours: 4,
+					TTLHours: 24 * 7,
+					Mode: "TTLPerLocation",
+				},
+			},
 		},
 	}
 
 	return config;
+}
+
+type any interface {
 }
 
 // Returns a new instance that is initialized from the specified file.
@@ -345,7 +390,7 @@ func NewConfig(fileName string) *Config {
 	if err == nil {
 		Out("Loading configuration from %v", fileName)
 
-		lists := []*[]string {&config.CleanTempLocationExclusions, &config.RestartTriggerTokens, &config.JavaArgs}
+		lists := []interface{} {&config.CleanupSettingsList, &config.RestartTriggerTokens, &config.JavaArgs}
 		captures := config.captureLists(lists...)
 
 		if err = xml.NewDecoder(file).Decode(config); err == nil {
@@ -364,21 +409,26 @@ func NewConfig(fileName string) *Config {
 
 // Captures the specified array lists and returns them as a single 2d array.
 // After capturing the values the source lists are reset to new empty arrays.
-func (self *Config) captureLists(lists ...*[]string) [][]string {
-	captures := make([][]string, len(lists))
+func (self *Config) captureLists(lists ...interface{}) []interface{} {
+	captures := make([]interface{}, len(lists))
 	for index, list := range lists {
-		captures[index] = *list
-		*list = []string{}
+		sliceType := reflect.SliceOf(reflect.TypeOf(list).Elem().Elem())
+		listValue := reflect.ValueOf(list).Elem()
+		len := listValue.Len()
+
+		captures[index] = reflect.MakeSlice(sliceType, len, len).Interface()
+		reflect.Copy(reflect.ValueOf(captures[index]), listValue)
+		listValue.Set(reflect.ValueOf(reflect.MakeSlice(sliceType, 0, 0).Interface()))
 	}
 
 	return captures
 }
 
 // Restores the specified lists from a previously captured state if the lists are still empty.
-func (self *Config) restoreListsIfEmpty(captures [][]string, lists ...*[]string) {
+func (self *Config) restoreListsIfEmpty(captures []interface{}, lists ...interface{}) {
 	for index, list := range lists {
-		if len(*list) == 0 {
-			*list = captures[index]
+		if reflect.ValueOf(list).Elem().Len() == 0 {
+			reflect.ValueOf(list).Elem().Set(reflect.ValueOf(captures[index]))
 		}
 	}
 }
