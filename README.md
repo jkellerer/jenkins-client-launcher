@@ -50,7 +50,7 @@ inside the current working directory should it be missing.
 > launcher -url=http://ci.tl/jenkins -secret=40cec6b0f...b9119008b07
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-###Attaching a node to Jenkins using centralized configuration
+###Attaching a node to Jenkins using centralized configuration (HTTP)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 > launcher -defaultConfig=http://ci.tl/launcher.config 
@@ -88,6 +88,21 @@ _Hints:_
 > launcher -defaultConfig=http://ci.tl/launcher.config -create  
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
+###Attaching a node to Jenkins using centralized configuration (Network Share)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> \\share\launcher -defaultConfig=. -directory=C:\Jenkins-CI\  
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**With `\\share\` being**:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\\share\
+    launcher.exe
+    launcher.config
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+_Note:_ `-defaultConfig=.` is an alias to `-defaultConfig=\\share\launcher.config` 
 
 ###Tunneling the JNLP client connection via SSH
 

@@ -32,9 +32,13 @@ Options:
 
 `)
 
+var AppImagePath = ""
+
 // Is the applications main run loop.
 func Run() {
 	fmt.Println("\n" + AppName + " " + AppVersion + "\n---------------------------")
+
+	AppImagePath, _ = filepath.Abs(os.Args[0])
 
 	modeNames := make([]string, len(modes.AllModes))
 	for i, m := range modes.AllModes { modeNames[i] = m.Name() }
@@ -53,7 +57,7 @@ func Run() {
 
 	dir := flag.String("directory", "", "Changes the current working directory before performing any other operations.")
 	saveChanges := flag.Bool("persist", false, "Stores any CLI config overrides inside '"+ConfigName+"'.")
-	defaultConfig := flag.String("defaultConfig", "", "Loads the initial config from the specified path or URL. " +
+	defaultConfig := flag.String("defaultConfig", "", "Loads the initial config from the specified path or URL (http[s]). " +
 				"Does nothing when '"+ConfigName+"' exists already.")
 	overwrite := flag.Bool("overwrite", false, "Overwrites '"+ConfigName+"' with the content from initial config " +
 				"(requires '-defaultConfig=...', implies '-persist=true').")
@@ -150,8 +154,20 @@ func ListenForKeyboardInput(config *util.Config) {
 // Handles the working directory that is used.
 func handleWorkingDirectory(dir string) {
 	wd, _ := os.Getwd()
+	dir = filepath.FromSlash(dir)
+
 	if len(dir) > 0 && dir != wd {
 		util.Out("Changing working directory to %v", dir)
+
+		if fi, err := os.Stat(dir); err != nil && os.IsNotExist(err) {
+			util.Out("Working directory %v does not exist, creating it now.", dir)
+			if err = os.MkdirAll(dir, os.ModeDir); err != nil {
+				panic(fmt.Sprintf("Failed creating working directory %v, stopping here to prevent any damage. Cause: %v", dir, err))
+			}
+		} else if !fi.IsDir() {
+			panic(fmt.Sprintf("%v is not a directory, cannot change working directory, stopping here to prevent any damage. Cause: %v", dir, err))
+		}
+
 		if err := os.Chdir(dir); err != nil {
 			wd, _ = os.Getwd()
 			panic(fmt.Sprintf("Failed changing working directory, stopping here to prevent any damage. Cause: %v ; CWD is %v", err, wd))
@@ -167,11 +183,12 @@ func loadConfig(defaultConfig string, overwriteWithInitial bool) *util.Config {
 	if len(defaultConfig) > 0 && (config.NeedsSave || overwriteWithInitial) {
 		var err error
 		var configSource io.ReadCloser
-		defer func() {
-			if (configSource != nil) {
-				configSource.Close()
-			}
-		}()
+		defer func() { if (configSource != nil) { configSource.Close() } }()
+
+		// If default config uses "." we search for it next to the location where the launcher executable resides.
+		if defaultConfig == "." {
+			defaultConfig = filepath.Join(filepath.Dir(AppImagePath), ConfigName)
+		}
 
 		if isHttpUrl, _ := regexp.MatchString("^(?i)http(s|)://.+", defaultConfig); isHttpUrl {
 			util.Out("Downloading: %v", defaultConfig)
