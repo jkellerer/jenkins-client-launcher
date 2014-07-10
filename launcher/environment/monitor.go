@@ -97,6 +97,10 @@ func (self *JenkinsNodeMonitor) monitor(config *util.Config) {
 		} else {
 			self.offlineCount++
 
+			if self.offlineCount > 3 * maxOfflineCountBeforeRestart {
+				self.offlineCount = maxOfflineCountBeforeRestart
+			}
+
 			if self.offlineCount == maxOfflineCountBeforeRestart {
 				self.forceReconnect(config)
 			}
