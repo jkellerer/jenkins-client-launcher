@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 	"strings"
+	"fmt"
+	"encoding/xml"
 )
 
 // Min time to persist entries inside the folders selected for cleanup.
@@ -17,12 +19,35 @@ var minCleanupTTL = time.Hour * 6
 // The min interval when folders selected for cleanup are monitored.
 var minMonitoringInterval = time.Hour * 2
 
+type JenkinsNodeConfig struct {
+	XMLName     xml.Name `xml:"slave"`
+	Name        string   `xml:"name"`
+	RemoteFS    string   `xml:"remoteFS"`
+}
+
+// Returns the current configuration of this Jenkins node from the Jenkins server.
+func GetJenkinsNodeConfig(config *util.Config) (*JenkinsNodeConfig, error) {
+	if response, err := config.CIGet(fmt.Sprintf("/computer/%s/config.xml", config.ClientName)); err == nil {
+		defer response.Body.Close()
+		if response.StatusCode == 200 {
+			config := &JenkinsNodeConfig{}
+			err = xml.NewDecoder(response.Body).Decode(config)
+			return config, err
+		} else {
+			return nil, fmt.Errorf(response.Status)
+		}
+	} else {
+		return nil, err
+	}
+}
+
 // Defines an object which continuously watches and cleans the temporary directory of
 // files that haven't been modified for maxTTLInTempDirectories (default 24 hours).
 type LocationCleaner struct {
 	util.AnyConfigAcceptor
 
-	tickers []*time.Ticker
+	tickers       []*time.Ticker
+	workspacePath string
 }
 
 func NewLocationCleaner() *LocationCleaner {
@@ -39,8 +64,9 @@ func (self *LocationCleaner) Prepare(config *util.Config) {
 	for _, ticker := range self.tickers {
 		ticker.Stop()
 	}
-	self.tickers = self.tickers[0:0]
 
+	self.tickers = self.tickers[0:0]
+	self.workspacePath = self.getWorkspacePath(config)
 
 	for _, setting := range config.Maintenance.CleanupSettingsList {
 		if !setting.Enabled {
@@ -48,6 +74,16 @@ func (self *LocationCleaner) Prepare(config *util.Config) {
 		}
 		self.initializeLocation(setting)
 	}
+}
+
+func (self *LocationCleaner) getWorkspacePath(config *util.Config) string {
+	baseDir := ""
+	if nodeConfig, err := GetJenkinsNodeConfig(config); err == nil && nodeConfig.RemoteFS != "" {
+		baseDir = filepath.FromSlash(nodeConfig.RemoteFS)
+	} else {
+		baseDir, _ = os.Getwd()
+	}
+	return filepath.Join(baseDir, "workspace")
 }
 
 func (self *LocationCleaner) initializeLocation(setting util.CleanupSettings) {
