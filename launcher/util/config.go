@@ -56,16 +56,27 @@ const (
   - noCertificateCheck: Toggles whether certificates are verified.
                         Enabling this option makes HTTPS connections as secure as HTTP connections.
                         (Use with caution!)
-</ci>
+
+  - tunnel>jnlp>ssh:    Toggles whether the JNLP connection to Jenkins is tunneled via a SSH server.
+                        Enabling this option allows to establish a secure tunnel between a node
+                        and the Jenkins server using SSH.
+                        SSH connections use public key fingerprint for verification. Add the SSH
+                        server's value to <fingerprint>00:00:00:....</fingerprint> to allow tunnling.
 `)
 
 type JenkinsConnection struct {
-	CIHostURI        string `xml:"ci>url"`
-	CIAcceptAnyCert  bool   `xml:"ci>noCertificateCheck"`
-	CIUsername       string `xml:"ci>auth>user"`
-	CIPassword       string `xml:"ci>auth>password"`
-	ciCrumbHeader    string `xml:"-"`
-	ciCrumbValue     string `xml:"-"`
+	CIHostURI              string `xml:"ci>url"`
+	CIAcceptAnyCert        bool   `xml:"ci>noCertificateCheck"`
+	CIUsername             string `xml:"ci>auth>user"`
+	CIPassword             string `xml:"ci>auth>password"`
+	CITunnelSSHEnabled     bool   `xml:"ci>tunnel>jnlp>ssh>enabled"`
+	CITunnelSSHAddress     string `xml:"ci>tunnel>jnlp>ssh>address"`
+	CITunnelSSHPort        uint16 `xml:"ci>tunnel>jnlp>ssh>port"`
+	CITunnelSSHFingerprint string `xml:"ci>tunnel>jnlp>ssh>fingerprint"`
+	CITunnelSSHUsername    string `xml:"ci>tunnel>jnlp>ssh>auth>user"`
+	CITunnelSSHPassword    string `xml:"ci>tunnel>jnlp>ssh>auth>password"`
+	ciCrumbHeader          string `xml:"-"`
+	ciCrumbValue           string `xml:"-"`
 }
 
 // Returns true if the configuration has a Jenkins url.
@@ -125,7 +136,7 @@ func (self *JenkinsConnection) CIRequest(method, path string, body io.Reader) (r
 }
 
 // Issues a HTTP-GET request on Jenkins using the specified request path (= path + query string).
-func (self *JenkinsConnection) CIGet(path string) (*http.Response, error) {
+func (self *JenkinsConnection) CIGet(path string) (response *http.Response, err error) {
 	if request, err := self.CIRequest("GET", path, nil); err != nil {
 		return nil, err
 	} else {

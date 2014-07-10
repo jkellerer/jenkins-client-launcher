@@ -22,9 +22,6 @@ var Java = ""
 // Contains additional java args that are added before the configured java args.
 var JavaArgs = []string{}
 
-// Contains an address (HOST:PORT) which mirrors the Jenkins client server port.
-var TransportTunnelAddress = ""
-
 // Prints stack traces of all go routines.
 func PrintAllStackTraces() {
 	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)

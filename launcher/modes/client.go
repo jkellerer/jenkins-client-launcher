@@ -125,11 +125,7 @@ func (self *ClientMode) execute(config *util.Config) {
 
 	if config.CIUsername != "" && config.CIPassword != "" && config.PassCIAuth {
 		commandline = append(commandline, "-auth", fmt.Sprintf("%s:%s", config.CIUsername, config.CIPassword))
-		//commandline = append(commandline, "-jnlpCredentials", fmt.Sprintf("%s:%s", config.CIUsername, config.CIPassword))
-	}
-
-	if util.TransportTunnelAddress != "" {
-		commandline = append(commandline, "-connectTo", util.TransportTunnelAddress)
+		commandline = append(commandline, "-jnlpCredentials", fmt.Sprintf("%s:%s", config.CIUsername, config.CIPassword))
 	}
 
 	stoppingClient, clientStopped := make(chan bool), make(chan bool)

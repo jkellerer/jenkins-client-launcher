@@ -16,8 +16,9 @@ Features
 - Config file driven with support for centralized configuration.
 - Prepare & maintain the environment:
 	- Keep Jenkins client up-to-date.
-	- Install Java if required.
+	- Check if Java installation is required.
 	- Remove outdated temporary files and workspaces.
+- SSH tunnel support (connect to Jenkins via SSH).
 - Monitoring with restart on failure:
 	- Detect client crash e.g. OutOfMemory.
 	- Detect remote offline state of the node by querying Jenkins server.
@@ -25,9 +26,10 @@ Features
 Limitations / Roadmap / Wishlist
 --------------------------------
 
-- More tests
-- SSH tunnel support (connect to Jenkins over SSH)
-- SSH server mode (allow connections from Jenkins)
+- More tests.
+- File based logging.
+- Install Java when required.
+- SSH server mode (allow connections from Jenkins).
 
 
 Usage
@@ -155,7 +157,7 @@ High Level Architecture
     | - JavaDownloader/Installer |      | <Loop... until term signal>         |
     | - JenkinsNodeMonitor       |      +-------------------------------------+
     | - JenkinsClientDownloader  |      |         [Active RunMode?]           |
-    | - TempLocationCleaner      |      |             /     \                 |
+    | - LocationCleaner          |      |             /     \                 |
     | - ...                      |      |  +----------+     +------------+    |
     +----------------------------+      |  | Client   |     | SSH server |    |
                                         |  +----------+     +------------+    |
