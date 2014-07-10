@@ -31,16 +31,16 @@ type JenkinsNodeStatus struct {
 
 // Returns the current offline and idle status of this Jenkins node from the Jenkins server.
 func GetJenkinsNodeStatus(config *util.Config) (*JenkinsNodeStatus, error) {
-	response, err := config.CIGet(fmt.Sprintf(NodeMonitoringURI, config.ClientName))
-	if err == nil && response.StatusCode == 200 {
+	if response, err := config.CIGet(fmt.Sprintf(NodeMonitoringURI, config.ClientName)); err == nil {
 		defer response.Body.Close()
-		status := &JenkinsNodeStatus{}
-		err = xml.NewDecoder(response.Body).Decode(status)
-		return status, err
-	} else {
-		if err == nil && response != nil {
-			err = fmt.Errorf(response.Status)
+		if response.StatusCode == 200 {
+			status := &JenkinsNodeStatus{}
+			err = xml.NewDecoder(response.Body).Decode(status)
+			return status, err
+		} else {
+			return nil, fmt.Errorf(response.Status)
 		}
+	} else {
 		return nil, err
 	}
 }
