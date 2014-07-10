@@ -71,8 +71,49 @@ inside the current working directory should it be missing.
 </config>
 ```
 
-_Hint:_ Add `-name=name-of-node-in-jenkins` if the node name is not the same as the hostname of 
-the computer where the launcher is started.
+_Hints:_ 
+
+- Add `-name=name-of-node-in-jenkins` if the node name is not the same as the hostname of 
+  the computer where the launcher is started:
+  
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> launcher -defaultConfig=http://ci.tl/launcher.config -name=name-of-node-in-jenkins  
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  
+- Add `-create` if a new node should be created in Jenkins when no matching node can
+  be found. When required the launcher creates a new JNLP type node using the computer's hostname
+  as node name (by default, if not overridden):
+  
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> launcher -defaultConfig=http://ci.tl/launcher.config -create  
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  
+
+###Tunneling the JNLP client connection via SSH
+
+Add the following section to `launcher.config`: 
+
+```xml
+<config ... >
+    <ci>
+        ...
+        <tunnel>
+            <jnlp>
+                <ssh>
+                    <enabled>true</enabled>
+                    <address>ssh-host</address>
+                    <port>22</port>
+                    <fingerprint>65:30:38:96:35:56:4f:64:64:e8:e3:a4:7d:59:3e:19</fingerprint>
+                    <auth>
+                        <user>admin</user>
+                        <password>changeit</password>
+                    </auth>
+                </ssh>
+            </jnlp>
+        </tunnel>
+    </ci>
+</config>
+```
 
 ###Autostart next time the OS boots
 
