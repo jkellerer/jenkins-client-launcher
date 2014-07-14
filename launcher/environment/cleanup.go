@@ -13,6 +13,13 @@ import (
 	"encoding/xml"
 )
 
+const (
+	// Defines an operational mode where the whole location is cleaned when all files contained inside are expired.
+	ModeTTLPerLocation = "TTLPerLocation"
+	// Defines an operational mode where indivial files are cleaned as they expire.
+	ModeTTLPerFile = "TTLPerFile"
+)
+
 // Min time to persist entries inside the folders selected for cleanup.
 var minCleanupTTL = time.Hour * 6
 
@@ -99,9 +106,7 @@ func (self *LocationCleaner) initializeLocation(setting util.CleanupSettings) {
 	findLocations := func() []string {
 		loc := os.Expand(setting.Location, func(name string) string {
 				if strings.EqualFold(name, "workspace") {
-					// TODO: Get real workspace path here
-					cwd, _ := os.Getwd()
-					return filepath.Join(cwd, "workspace")
+					return self.workspacePath
 				} else {
 					return os.Getenv(name)
 				}
@@ -137,23 +142,26 @@ func (self *LocationCleaner) initializeLocation(setting util.CleanupSettings) {
 
 func (self *LocationCleaner) waitForIdle() {
 	for !util.NodeIsIdle.Get() {
-		util.GOut("temp", "Waiting for node to become IDLE before cleaning configured locations.")
+		util.GOut("cleanup", "Waiting for node to become IDLE before cleaning configured locations.")
 		time.Sleep(time.Minute * 5)
 	}
 }
 
 func (self *LocationCleaner) cleanupLocations(dirsToKeepClean, exclusions []string, mode string, maxTTL time.Duration) {
 	for _, rootDir := range dirsToKeepClean {
-		util.GOut("temp", "Cleaning expired files in %v", rootDir)
-
+		rootDir = filepath.Clean(rootDir)
 		dirToEmptyMap := map[string]bool{}
 		expiredTimeOffset := time.Now().Add(-maxTTL)
 
-		if mode == "TTLPerLocation" {
+		if mode == ModeTTLPerLocation {
+			util.GOut("cleanup", "Checking %v for expiration.", rootDir)
 			exclusionCount := self.cleanupFiles(rootDir, expiredTimeOffset, true, exclusions, dirToEmptyMap)
 			if exclusionCount > 0 {
 				return
 			}
+			util.GOut("cleanup", "Cleaning %v", rootDir)
+		} else {
+			util.GOut("cleanup", "Cleaning expired files in %v", rootDir)
 		}
 
 		// Handling outdated temporary files
@@ -161,9 +169,14 @@ func (self *LocationCleaner) cleanupLocations(dirsToKeepClean, exclusions []stri
 
 		// Handling all directories that are known to be empty
 		for dirPath, emptyDir := range dirToEmptyMap {
+			// Root-Dir is only cleaned for "TTLPerLocation".
+			if mode != ModeTTLPerLocation && rootDir == dirPath {
+				continue
+			}
+
 			if emptyDir {
 				if err := os.Remove(dirPath); err == nil {
-					util.GOut("temp", "Removed empty directory: %v", dirPath)
+					util.GOut("cleanup", "Removed empty directory: %v", dirPath)
 				}
 			}
 		}
@@ -198,7 +211,7 @@ func (self *LocationCleaner) cleanupFiles(rootDir string, expiredTimeOffset time
 					if fileIsToRemove {
 						if !dryRun {
 							if err := os.Remove(path); err == nil {
-								util.GOut("temp", "Removed expired: %v", path)
+								util.GOut("cleanup", "Removed expired: %v", path)
 							}
 						}
 					} else {
