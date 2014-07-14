@@ -20,7 +20,7 @@ import (
 const (
 	ConfigName     = "launcher.config"
 	AppName        = "Jenkins Client Launcher"
-	AppVersion     = "0.1"
+	AppVersion     = "0.2"
 	AppDescription = `
 This application attempts to provide a stable runtime environment for a Jenkins client.
 Regardless of the run mode, clients are started in 'user-mode' inheriting user & environment of the caller.
