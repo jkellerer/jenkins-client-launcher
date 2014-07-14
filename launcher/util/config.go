@@ -254,8 +254,10 @@ const (
                    <location>${temp}</location>
                    <onlyWhenIdle>true</onlyWhenIdle>
                    <interval><hours>4</hours></interval>
-                   <ttl><hours>72</hours></ttl>
-                   <mode>TTLPerFile</mode>
+                   <ttl>
+                     <hours>72</hours>
+                     <mode>TTLPerFile</mode>
+                   </ttl>
                    <exclusions>
                      <exclusion>*.dll</exclusion>
                      <exclusion>*\mypath\*</exclusion>
@@ -274,7 +276,7 @@ type CleanupSettings struct {
 	OnlyWhenIDLE    bool     `xml:"onlyWhenIdle"`
 	IntervalHours   int64    `xml:"interval>hours"`
 	TTLHours        int64    `xml:"ttl>hours"`
-	Mode            string   `xml:"mode"`
+	Mode            string   `xml:"ttl>mode"`
 	Exclusions      []string `xml:"exclusions>exclusion"`
 }
 
