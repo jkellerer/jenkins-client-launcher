@@ -302,7 +302,7 @@ type Config struct {
 
 // Returns a new instance of config with default values.
 func NewDefaultConfig() *Config {
-	hostname, err := os.Hostname()
+	hostname, err := Hostname()
 	if err != nil { hostname = "" }
 
 	config := &Config{

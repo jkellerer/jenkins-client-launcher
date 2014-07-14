@@ -84,7 +84,7 @@ func (self *NodeNameHandler) Prepare(config *util.Config) {
 func (self *NodeNameHandler) verifyNodeName(config *util.Config) (bool, error) {
 	clientName := config.ClientName
 	if clientName == "" {
-		if name, err := os.Hostname(); err == nil {
+		if name, err := util.Hostname(); err == nil {
 			clientName = name
 			config.ClientName = name
 		}
