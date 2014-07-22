@@ -195,7 +195,7 @@ func (self *LocationCleaner) cleanupFiles(rootDir string, expiredTimeOffset time
 				} else {
 					fileIsToRemove := true
 
-					if fileIsToRemove && info.ModTime().After(expiredTimeOffset) {
+					if fileIsToRemove && util.GetFileLastTouched(info).After(expiredTimeOffset) {
 						fileIsToRemove = false
 					}
 
