@@ -13,13 +13,13 @@ import (
 
 const (
 	FullGCURL      = "/computer/%s/scriptText"
-	FullGCScript   = "System.gc()"
+	FullGCScript   = "3.times{ System.gc() }"
 	FullGCPostBody = "script=%s"
 )
 
 // Defines an object which triggers a periodic restart of the Jenkins client when enabled.
 type FullGCInvoker struct {
-	ticker *time.Ticker
+	tickers []*time.Ticker
 }
 
 func (self *FullGCInvoker) Name() string {
@@ -35,37 +35,41 @@ func (self *FullGCInvoker) IsConfigAcceptable(config *util.Config) (bool) {
 }
 
 func (self *FullGCInvoker) Prepare(config *util.Config) {
-	if self.ticker != nil {
-		self.ticker.Stop()
+	if self.tickers != nil {
+		for _, ticker := range self.tickers {
+			ticker.Stop()
+		}
+	} else {
+		self.tickers = []*time.Ticker{}
 	}
 
-	if !config.ForceFullGC || config.ForceFullGCIntervalMinutes <= 0 {
+	if !config.ForceFullGC {
 		return
 	}
 
-	self.ticker = time.NewTicker(time.Minute*time.Duration(config.ForceFullGCIntervalMinutes))
+	util.GOut("gc", "Periodic forced full GC is enabled.")
 
-	if config.ForceFullGCOnlyWhenIDLE {
-		util.GOut("gc", "Periodic forced full GC is enabled when the node is IDLE.")
-	} else {
-		util.GOut("gc", "Periodic forced full GC is enabled.")
+	if (config.ForceFullGCIntervalMinutes > 0) {
+		self.tickers = append(self.tickers, self.scheduleGCInvoker(config, config.ForceFullGCIntervalMinutes, false))
 	}
 
-	go func() {
-		// Run in schedule
-		for _ = range self.ticker.C {
-			self.waitForIdleIfRequired(config)
-			self.invokeSystemGC(config)
-		}
-	}()
+	if (config.ForceFullGCIDLEIntervalMinutes > 0) {
+		self.tickers = append(self.tickers, self.scheduleGCInvoker(config, config.ForceFullGCIDLEIntervalMinutes, true))
+	}
 }
 
-func (self *FullGCInvoker) waitForIdleIfRequired(config *util.Config) {
-	if config.ForceFullGCOnlyWhenIDLE {
-		for !util.NodeIsIdle.Get() {
-			time.Sleep(time.Second * 30)
+func (self *FullGCInvoker) scheduleGCInvoker(config *util.Config, intervalMinutes int64, expectedIDLEState bool) (ticker *time.Ticker) {
+	ticker = time.NewTicker(time.Minute*time.Duration(intervalMinutes))
+
+	go func() {
+		for _ = range ticker.C {
+			if util.NodeIsIdle.Get() == expectedIDLEState {
+				self.invokeSystemGC(config)
+			}
 		}
-	}
+	}()
+
+	return;
 }
 
 func (self *FullGCInvoker) invokeSystemGC(config *util.Config) {

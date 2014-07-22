@@ -107,6 +107,10 @@ func (self *ClientMode) execute(config *util.Config) {
 	commandline := []string{}
 	commandline = append(commandline, util.JavaArgs...)
 	commandline = append(commandline, config.JavaArgs...)
+	if config.JavaMaxMemory != "" {
+		commandline = append(commandline, "-Xmx" + config.JavaMaxMemory)
+	}
+
 	commandline = append(commandline,
 		"-jar", util.ClientJar,
 		"-jnlpUrl", fmt.Sprintf("%v/computer/%v/slave-agent.jnlp", config.CIHostURI, config.ClientName))

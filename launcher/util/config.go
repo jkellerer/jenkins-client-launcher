@@ -168,16 +168,20 @@ const (
                    The default options try to optimise GC for low footprint instead of performance in
                    order to leave more memory for IO and forked build tasks.
 
+  - maxMemory:     Allows to set the max memory that java will attempt to use.
+                   When not specified, 25% of the OS RAM are used. Accepted values are: 524288k, 512m, 1g, ...
+
   - forceFullGC:   Allows to enable periodic calls to "System.gc()" to reduce the overall memory
                    usage of the Jenkins Client.
 </java>
 `)
 
 type JavaOptions struct {
-	JavaArgs                   []string `xml:"java>args>arg"`
-	ForceFullGC                bool     `xml:"java>forceFullGC>enabled"`
-	ForceFullGCOnlyWhenIDLE    bool     `xml:"java>forceFullGC>onlyWhenIdle"`
-	ForceFullGCIntervalMinutes int64    `xml:"java>forceFullGC>interval>minutes"`
+	JavaArgs                        []string `xml:"java>args>arg"`
+	JavaMaxMemory                   string   `xml:"java>maxMemory"`
+	ForceFullGC                     bool     `xml:"java>forceFullGC>enabled"`
+	ForceFullGCIntervalMinutes      int64    `xml:"java>forceFullGC>interval>minutes"`
+	ForceFullGCIDLEIntervalMinutes  int64    `xml:"java>forceFullGC>idleInterval>minutes"`
 }
 
 const (
@@ -346,9 +350,10 @@ func NewDefaultConfig() *Config {
 				"-XX:+ClassUnloading",
 				"-XX:+UseMaximumCompactionOnSystemGC",
 			},
+			JavaMaxMemory: "",
 			ForceFullGC: true,
-			ForceFullGCOnlyWhenIDLE: true,
-			ForceFullGCIntervalMinutes: 5,
+			ForceFullGCIntervalMinutes: 3,
+			ForceFullGCIDLEIntervalMinutes: 5,
 		},
 		SSHServer: SSHServer{
 			SSHListenAddress: "0.0.0.0",
