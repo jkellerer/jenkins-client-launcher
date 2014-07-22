@@ -80,6 +80,9 @@ func (self *JenkinsNodeMonitor) Prepare(config *util.Config) {
 				self.monitor(config)
 			}
 		}()
+	} else {
+		// Setting IDLE to always true if active monitoring is disabled.
+		util.NodeIsIdle.Set(true)
 	}
 }
 
@@ -87,7 +90,8 @@ func (self *JenkinsNodeMonitor) Prepare(config *util.Config) {
 // Forces a restart of the connector when offline count reaches the threshold.
 func (self *JenkinsNodeMonitor) monitor(config *util.Config) {
 	if self.isThisSideConnected(config) {
-		if self.isServerSideConnected(config) {
+		if connected, idle := self.isServerSideConnected(config); connected {
+			util.NodeIsIdle.Set(idle)
 			self.offlineCount = 0
 
 			if !self.onlineShown {
@@ -95,6 +99,7 @@ func (self *JenkinsNodeMonitor) monitor(config *util.Config) {
 				self.onlineShown = true
 			}
 		} else {
+			util.NodeIsIdle.Set(true)
 			self.offlineCount++
 
 			if self.offlineCount > 3 * maxOfflineCountBeforeRestart {
@@ -109,26 +114,29 @@ func (self *JenkinsNodeMonitor) monitor(config *util.Config) {
 			self.onlineShown = false
 		}
 	} else {
+		util.NodeIsIdle.Set(true)
 		self.offlineCount = 0
 
-		self.onlineShown = false
+		if self.onlineShown {
+			util.GOut("monitor", "Node went OFFLINE locally.")
+			self.onlineShown = false
+		}
 	}
 }
 
 // Checks if the run mode is in started state.
+// Also updates the global "util.NodeIsIdle" state to true if run mode is not in started state.
 func (self *JenkinsNodeMonitor) isThisSideConnected(config *util.Config) bool {
 	return modes.GetConfiguredMode(config).Status().Get() == modes.ModeStarted
 }
 
-// Checks if Jenkins shows this node as connected.
-// Also updates the global "util.NodeIsIdle" state.
-func (self *JenkinsNodeMonitor) isServerSideConnected(config *util.Config) bool {
+// Checks if Jenkins shows this node as connected and returns the node's IDLE state as second return value.
+func (self *JenkinsNodeMonitor) isServerSideConnected(config *util.Config) (connected bool, idle bool) {
 	if status, err := GetJenkinsNodeStatus(config); err == nil {
-		util.NodeIsIdle.Set(status.Idle)
-		return !status.Offline
+		return !status.Offline, status.Idle
 	} else {
 		util.GOut("monitor", "Failed to monitor node %v using %v. Cause: %v", config.ClientName, config.CIHostURI, err)
-		return false
+		return false, true
 	}
 }
 
