@@ -6,6 +6,7 @@ package util
 import (
 	"time"
 	"os"
+	"syscall"
 )
 
 func GetFileLastTouched(info os.FileInfo) (lastTouched time.Time) {
@@ -13,8 +14,8 @@ func GetFileLastTouched(info os.FileInfo) (lastTouched time.Time) {
 
 	if value, ok := info.Sys().(*syscall.Stat_t); ok {
 		times := []time.Time{
-			time.Unix(int64(stat.Atim.Sec), int64(stat.Atim.Nsec)),
-			time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec)),
+			time.Unix(int64(value.Atim.Sec), int64(value.Atim.Nsec)),
+			time.Unix(int64(value.Ctim.Sec), int64(value.Ctim.Nsec)),
 		}
 
 		for _, time := range times {
