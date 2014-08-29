@@ -72,7 +72,7 @@ func (self *ClientMode) IsConfigAcceptable(config *util.Config) (bool) {
 		return false
 	}
 
-	if config.SecretKey == "" {
+	if config.SecretKey == "" && !self.isAuthCredentialsPassedViaCommandline(config) {
 		if config.SecretKey = self.getSecretFromJenkins(config); config.SecretKey == "" {
 			util.GOut(self.Name(), "No secret key set for node %v and the attempt to fetch it from Jenkins failed.", config.ClientName)
 			return false
@@ -127,7 +127,7 @@ func (self *ClientMode) execute(config *util.Config) {
 		commandline = append(commandline, "-noReconnect")
 	}
 
-	if config.CIUsername != "" && config.CIPassword != "" && config.PassCIAuth {
+	if self.isAuthCredentialsPassedViaCommandline(config) {
 		commandline = append(commandline, "-auth", fmt.Sprintf("%s:%s", config.CIUsername, config.CIPassword))
 		commandline = append(commandline, "-jnlpCredentials", fmt.Sprintf("%s:%s", config.CIUsername, config.CIPassword))
 	}
@@ -183,6 +183,10 @@ func (self *ClientMode) execute(config *util.Config) {
 	<-clientStopped
 
 	self.status.Set(ModeStopped)
+}
+
+func (self *ClientMode) isAuthCredentialsPassedViaCommandline(config *util.Config) bool {
+	return config.CIUsername != "" && config.CIPassword != "" && config.PassCIAuth
 }
 
 func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.ReadCloser, output io.Writer) {
