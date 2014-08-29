@@ -153,7 +153,7 @@ _Hint:_ Adding `-create` to the commandline enables auto creation of the node in
 Building
 --------
 
-- **Go >= 1.2** is required
+- **Go >= 1.2** is required ( _Mercurial_ and _Git_ must also be installed to allow _go_ to fetch dependencies )
 - **Create Go Workspace** if missing:
 
 ```Batchfile
