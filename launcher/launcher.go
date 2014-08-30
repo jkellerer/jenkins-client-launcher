@@ -36,7 +36,7 @@ var AppImagePath = ""
 
 // Is the applications main run loop.
 func Run() {
-	fmt.Println("\n" + AppName + " " + AppVersion + "\n---------------------------")
+	util.FlatOut("\n%s %s\n---------------------------", AppName, AppVersion)
 
 	AppImagePath, _ = filepath.Abs(os.Args[0])
 
@@ -112,19 +112,17 @@ func Run() {
 
 	timeOfLastStart := time.Now()
 
-	go ListenForKeyboardInput(config)
+	go listenForKeyboardInput(config, &restartCount)
 
 	for modes.RunConfiguredMode(config) {
-		fmt.Print("\n:::::::::::::::::::::::::::::::::\n")
-		fmt.Print("::  Restarting Jenkins Client  ::")
-		fmt.Print("\n:::::::::::::::::::::::::::::::::\n\n")
+		util.FlatOut("\n:::::::::::::::::::::::::::::::::\n::  %25s  ::\n:::::::::::::::::::::::::::::::::\n", "Restarting Jenkins Client")
 
 		if timeOfLastStart.Before(time.Now().Add(-runTimeAfterResettingRestartCount)) {
 			restartCount = 0
 		}
 
 		if sleepTime := time.Duration(restartCount * sleepTimePerRestart); sleepTime > 0 {
-			fmt.Printf("Sleeping %v seconds before restarting the client.\n\n", sleepTime.Seconds())
+			util.FlatOut("Sleeping %v seconds before restarting the client.\n\n", sleepTime.Seconds())
 			time.Sleep(sleepTime)
 		}
 
@@ -134,13 +132,14 @@ func Run() {
 }
 
 // Listens for key codes.
-func ListenForKeyboardInput(config *util.Config) {
+func listenForKeyboardInput(config *util.Config, subsequentRestarts *int64) {
 	var keyCode = make([]byte, 1)
 	util.Out("Listening for keys: [%s]: Print Stacktrace | [%s]: Restart client.", "D+Return", "R+Return")
 	for {
 		if n, err := os.Stdin.Read(keyCode); err == nil && n == 1 {
 			switch keyCode[0] {
 			case 'r', 'R':
+				*subsequentRestarts = 0
 				modes.GetConfiguredMode(config).Stop()
 			case 'd', 'D':
 				util.PrintAllStackTraces()
