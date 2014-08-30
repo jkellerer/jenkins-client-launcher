@@ -176,7 +176,7 @@ func (self *LocationCleaner) cleanupLocations(dirsToKeepClean, exclusions []stri
 
 			if emptyDir {
 				if err := os.Remove(dirPath); err == nil {
-					util.GOut("cleanup", "Removed empty directory: %v", dirPath)
+					util.GOut("cleanup", "\x1b[39mRemoved empty directory: %v", dirPath)
 				}
 			}
 		}
@@ -211,7 +211,7 @@ func (self *LocationCleaner) cleanupFiles(rootDir string, expiredTimeOffset time
 					if fileIsToRemove {
 						if !dryRun {
 							if err := os.Remove(path); err == nil {
-								util.GOut("cleanup", "Removed expired: %v", path)
+								util.GOut("cleanup", "\x1b[39mRemoved expired: %v", path)
 							}
 						}
 					} else {
