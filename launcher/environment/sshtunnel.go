@@ -137,11 +137,13 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 	}
 
 	// Fetching target ports
-	jnlpAddress, err := self.formatJNLPHostAndPort(config)
+	jnlpTargetAddress, err := self.formatJNLPHostAndPort(config)
 	if err != nil {
 		util.GOut("ssh-tunnel", "ERROR: Failed fetching JNLP port from '%v'. Cause: %v.", config.CIHostURI, err)
 		return
 	}
+
+	httpTargetAddress := self.formatHttpHostAndPort();
 
 	// Creating a local server listeners to use for port forwarding.
 	httpListener, err1 := self.newLocalServerListener()
@@ -153,8 +155,8 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 	}
 
 	// Forward local connections to the HTTP(S)/JNLP ports.
-	go self.forwardLocalConnectionsTo(config, sshClient, httpListener, self.ciHostURL.Host)
-	go self.forwardLocalConnectionsTo(config, sshClient, jnlpListener, jnlpAddress)
+	go self.forwardLocalConnectionsTo(config, sshClient, httpListener, httpTargetAddress)
+	go self.forwardLocalConnectionsTo(config, sshClient, jnlpListener, jnlpTargetAddress)
 
 	// Apply the tunnel configuration
 	localCiURL, _ := url.Parse(self.ciHostURL.String())
@@ -208,19 +210,38 @@ func (self *SSHTunnelEstablisher) forwardLocalConnectionsTo(config *util.Config,
 	}
 }
 
-// Returns "hort:port" of the JNLP server listener.
-func (self *SSHTunnelEstablisher) formatJNLPHostAndPort(config *util.Config) (jnlpAddress string, err error) {
+// Returns "hort:port" of the JNLP server listener on Jenkins.
+func (self *SSHTunnelEstablisher) formatJNLPHostAndPort(config *util.Config) (hostAndPort string, err error) {
 	jnlpHost := self.ciHostURL.Host
-	if containsPort, _ := regexp.MatchString("^.+:[0-9]+$", jnlpHost); containsPort {
+	if self.ciHostContainsPort() {
 		jnlpHost = jnlpHost[0:strings.LastIndex(jnlpHost, ":")]
 	}
 
 	if jnlpPort, err := self.getJNLPListenerPort(config); err == nil {
-		jnlpAddress = fmt.Sprintf("%s:%s", jnlpHost, jnlpPort)
+		hostAndPort = fmt.Sprintf("%s:%s", jnlpHost, jnlpPort)
 	} else {
 		return "", err
 	}
 
+	return
+}
+
+// Returns "hort:port" of the HTTP/S server listener on Jenkins.
+func (self *SSHTunnelEstablisher) formatHttpHostAndPort() (hostAndPort string) {
+	if !self.ciHostContainsPort() {
+		port := 80
+		if strings.EqualFold(self.ciHostURL.Scheme, "https") {
+			port = 443
+		}
+		hostAndPort = fmt.Sprintf("%s:%v", self.ciHostURL.Host, port)
+	} else {
+		hostAndPort = self.ciHostURL.Host
+	}
+	return
+}
+
+func (self *SSHTunnelEstablisher) ciHostContainsPort() (containsPort bool) {
+	containsPort, _ = regexp.MatchString("^.+:[0-9]+$", self.ciHostURL.Host)
 	return
 }
 

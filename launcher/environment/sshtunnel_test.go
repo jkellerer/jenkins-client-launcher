@@ -6,6 +6,7 @@ package environment
 import (
 	"testing"
 	"code.google.com/p/go.crypto/ssh"
+	"net/url"
 )
 
 var sshTunnel = NewSSHTunnelEstablisher(false)
@@ -18,3 +19,23 @@ func TestCanCreateHostFingerPrint(t *testing.T) {
 		t.Errorf("sshTunnel.formatHostFingerprint(key) = %v, want %v", in, out)
 	}
 }
+
+func TestCanFormatTargetHTTPHostAndPort(t *testing.T) {
+	tests := [][]string {
+		{"http://jenkins", "jenkins:80"},
+		{"https://jenkins", "jenkins:443"},
+		{"http://jenkins:8080", "jenkins:8080"},
+		{"https://jenkins:8080", "jenkins:8080"},
+		{"http://[::1]:123", "[::1]:123"},
+		{"http://[::1]", "[::1]:80"},
+	}
+
+	for _, test := range tests {
+		sshTunnel.ciHostURL, _ = url.Parse(test[0])
+		in, out := sshTunnel.formatHttpHostAndPort(), test[1]
+		if in != out {
+			t.Errorf("sshTunnel.formatHttpHostAndPort(%v) = %v, want %v", test[0], in, out)
+		}
+	}
+}
+
