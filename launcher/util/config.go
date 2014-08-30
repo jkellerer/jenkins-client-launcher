@@ -419,7 +419,7 @@ func NewConfig(fileName string) *Config {
 	}
 
 	if err != nil {
-		Out("Using default configuration. Loading '%v' failed: %v", fileName, err)
+		Out("WARN: Using default configuration. Loading '%v' failed: %v", fileName, err)
 	}
 
 	return config;
@@ -469,7 +469,7 @@ func (self *Config) Save(fileName string) {
 		enc.Indent("", "    ")
 
 		if err := enc.Encode(self); err != nil {
-			Out("Failed writing configuration to %v \nError: %v", file, err)
+			Out("ERROR: Failed writing configuration to %v \nCause: %v", file, err)
 		}
 	}
 }

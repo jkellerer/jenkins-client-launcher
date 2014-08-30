@@ -44,7 +44,7 @@ func RunPreparers(config *util.Config) {
 		if p.IsConfigAcceptable(config) {
 			enabledPreparers[p.Name()] = true
 		} else {
-			util.GOut("ENV", "WARN: Environment preparer " + p.Name() + " does not accept the current config and it won't operate.")
+			util.GOut("ENV", "WARN: Environment preparer %s does not accept the current config and won't operate.", p.Name())
 			util.GOut("ENV", "Adjust the configuration to prevent the warning above.")
 		}
 	})

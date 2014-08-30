@@ -63,7 +63,7 @@ func (self *NodeNameHandler) Prepare(config *util.Config) {
 				if err := self.createNode(config); err == nil {
 					util.GOut("naming", "Created node '%s' in Jenkins.", config.ClientName)
 				} else {
-					util.GOut("naming", "Tried to create node '%s' in Jenkins but failed. Cause: %v", config.ClientName, err)
+					util.GOut("naming", "ERROR: Failed to create node '%s' in Jenkins. Cause: %v", config.ClientName, err)
 				}
 				foundNode, _ = self.verifyNodeName(config)
 			} else {
@@ -74,10 +74,10 @@ func (self *NodeNameHandler) Prepare(config *util.Config) {
 		if foundNode {
 			util.GOut("naming", "Found client node name in Jenkins, using '%v'.", config.ClientName)
 		} else {
-			util.GOut("naming", "Client node name '%v' was NOT FOUND in Jenkins. Likely the next operations will fail.", config.ClientName)
+			util.GOut("naming", "WARN: Client node name '%v' was %s in Jenkins. Likely the next operations will fail.", config.ClientName, "NOT FOUND")
 		}
 	} else {
-		util.GOut("nameing", "Failed to verify the client node name in Jenkins. Cause: %v", err)
+		util.GOut("nameing", "ERROR: Failed to verify the client node name in Jenkins. Cause: %v", err)
 	}
 }
 

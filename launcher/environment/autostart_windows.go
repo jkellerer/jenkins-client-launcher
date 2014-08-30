@@ -67,14 +67,14 @@ func (self *AutostartHandler) Prepare(config *util.Config) {
 		util.GOut("autostart", "Registering %v for autostart.", self.commandline)
 		err := self.register()
 		if (err != nil) {
-			util.GOut("autostart", "FAILED to register for autostart. Cause: %v", err)
+			util.GOut("autostart", "ERROR: FAILED to register for autostart. Cause: %v", err)
 		}
 	} else {
 		if self.isRegistered() {
 			util.GOut("autostart", "Unregistering %v from autostart.", self.commandline)
 			err := self.unregister()
 			if (err != nil) {
-				util.GOut("autostart", "FAILED to unregister from autostart. Cause: %v", err)
+				util.GOut("autostart", "ERROR: FAILED to unregister from autostart. Cause: %v", err)
 			}
 		}
 	}

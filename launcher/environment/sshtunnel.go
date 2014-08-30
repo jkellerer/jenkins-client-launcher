@@ -54,11 +54,11 @@ func (self *SSHTunnelEstablisher) Name() string {
 
 func (self *SSHTunnelEstablisher) IsConfigAcceptable(config *util.Config) (bool) {
 	if config.CITunnelSSHEnabled && config.CITunnelSSHAddress == "" {
-		util.GOut("ssh-tunnel", "SSH tunnel is enabled but SSH server address is empty.");
+		util.GOut("ssh-tunnel", "WARN: SSH tunnel is enabled but SSH server address is empty.");
 		return false
 	}
 	if config.CITunnelSSHAddress != "" && !config.HasCIConnection() {
-		util.GOut("ssh-tunnel", "No Jenkins URI defined. SSH tunnel settings are not enouht to connect to Jenkins.");
+		util.GOut("ssh-tunnel", "WARN: No Jenkins URI defined. SSH tunnel settings are not enough to connect to Jenkins.");
 		return false
 	}
 	return true
@@ -114,7 +114,7 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 		self.closables = append(self.closables, sshClient)
 		util.GOut("ssh-tunnel", "Successfully connected with '%v'.", sshAddress)
 	} else {
-		util.GOut("ssh-tunnel", "Failed connecting with %v. Cause: %v", sshAddress, err)
+		util.GOut("ssh-tunnel", "ERROR: Failed connecting with %v. Cause: %v", sshAddress, err)
 		return
 	}
 
@@ -125,11 +125,11 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 		util.GOut("ssh-tunnel", "Opened local listener on '%v'.", serverListener.Addr())
 
 		if err = self.applyTunnelAddress(config, serverListener.Addr().String()); err != nil {
-			util.GOut("ssh-tunnel", "Failed configuring local listener as tunnel inside Jenkins. Cause: %v", err)
+			util.GOut("ssh-tunnel", "ERROR: Failed configuring local listener as tunnel inside Jenkins. Cause: %v", err)
 			return
 		}
 	} else {
-		util.GOut("ssh-tunnel", "Failed opening local listener. Cause: %v", err)
+		util.GOut("ssh-tunnel", "ERROR: Failed opening local listener. Cause: %v", err)
 		return
 	}
 
@@ -142,7 +142,7 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 func (self *SSHTunnelEstablisher) forwardLocalConnectionsToJNLP(config *util.Config, serverListener net.Listener, sshClient *ssh.Client) {
 	jnlpAddress, err := self.formatJNLPHostAndPort(config)
 	if err != nil {
-		util.GOut("ssh-tunnel", "Failed fetching JNLP port from '%v'. Cause: %v.", config.CIHostURI, err)
+		util.GOut("ssh-tunnel", "ERROR: Failed fetching JNLP port from '%v'. Cause: %v.", config.CIHostURI, err)
 		return
 	}
 
@@ -162,10 +162,10 @@ func (self *SSHTunnelEstablisher) forwardLocalConnectionsToJNLP(config *util.Con
 				util.GOut("ssh-tunnel", "Forwarding local connection to '%v' via '%v'.", jnlpAddress, sshClient.Conn.RemoteAddr().String())
 				establishBIDITransport(sourceConnection, targetConnection)
 			} else {
-				util.GOut("ssh-tunnel", "Failed forwarding incoming local connection to '%v' via '%v'.", jnlpAddress, sshClient.Conn.RemoteAddr().String())
+				util.GOut("ssh-tunnel", "ERROR: Failed forwarding incoming local connection to '%v' via '%v'.", jnlpAddress, sshClient.Conn.RemoteAddr().String())
 			}
 		} else {
-			util.GOut("ssh-tunnel", "Failed accepting next incoming local connection, assuming connection was closed.")
+			util.GOut("ssh-tunnel", "ERROR: Failed accepting next incoming local connection, assuming connection was closed.")
 			return
 		}
 	}
@@ -176,7 +176,7 @@ func (self *SSHTunnelEstablisher) formatJNLPHostAndPort(config *util.Config) (jn
 	jnlpHost := "localhost"
 	jenkinsUrl, err := url.Parse(config.CIHostURI)
 	if err != nil {
-		util.GOut("ssh-tunnel", "Failed extracting host out of url '%v'. Cause: %v.", config.CIHostURI, err)
+		util.GOut("ssh-tunnel", "ERROR: Failed extracting host out of url '%v'. Cause: %v.", config.CIHostURI, err)
 	} else {
 		jnlpHost = jenkinsUrl.Host
 		if containsPort, _ := regexp.MatchString("^.+:[0-9]+$", jnlpHost); containsPort {

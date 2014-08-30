@@ -54,7 +54,7 @@ func (self *OutOfMemoryErrorRestarter) Prepare(config *util.Config) {
 			// Run in schedule
 			for _ = range self.ticker.C {
 				if self.oomErrorTriggered() {
-					util.GOut("OOM", "A client restart is now triggered as consequence to an OutOfMemory error inside the JVM.")
+					util.GOut("OOM", "WARN: A client restart is now triggered as consequence to an OutOfMemory error inside the JVM.")
 					self.waitForIdleIfRequired(config)
 					// Stopping the mode as this will automatically do a restart.
 					modes.GetConfiguredMode(config).Stop()

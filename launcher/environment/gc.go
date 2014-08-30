@@ -28,7 +28,7 @@ func (self *FullGCInvoker) Name() string {
 
 func (self *FullGCInvoker) IsConfigAcceptable(config *util.Config) (bool) {
 	if config.ForceFullGC && !config.HasCIConnection() {
-		util.GOut("gc", "No Jenkins URI defined. System.GC() cannot be called inside the Jenkins client.");
+		util.GOut("gc", "WARN: No Jenkins URI defined. System.GC() cannot be called inside the Jenkins client.");
 		return false;
 	}
 	return true;
@@ -80,10 +80,10 @@ func (self *FullGCInvoker) invokeSystemGC(config *util.Config) {
 		if response, err := config.CIClient().Do(request); err == nil {
 			response.Body.Close()
 			if response.StatusCode != 200 {
-				util.GOut("gc", "Failed invoking full GC as node request in Jenkins failed with %s", response.Status)
+				util.GOut("gc", "ERROR: Failed invoking full GC as node request in Jenkins failed with %s", response.Status)
 			}
 		} else {
-			util.GOut("gc", "Failed invoking full GC as Jenkins cannot be contacted. Cause: %v", err)
+			util.GOut("gc", "ERROR: Failed invoking full GC as Jenkins cannot be contacted. Cause: %v", err)
 		}
 	}
 }

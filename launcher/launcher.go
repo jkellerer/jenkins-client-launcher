@@ -20,7 +20,7 @@ import (
 const (
 	ConfigName     = "launcher.config"
 	AppName        = "Jenkins Client Launcher"
-	AppVersion     = "0.2"
+	AppVersion     = "0.3"
 	AppDescription = `
 This application attempts to provide a stable runtime environment for a Jenkins client.
 Regardless of the run mode, clients are started in 'user-mode' inheriting user & environment of the caller.
@@ -69,7 +69,7 @@ func Run() {
 	handleWorkingDirectory(*dir)
 
 	if alreadyRunning := CheckIfAlreadyRunning(); alreadyRunning {
-		util.Out("Another launcher is already running with the same configuration. Exiting...")
+		util.Out("WARN: Another launcher is already running with the same configuration. Exiting...")
 		return
 	} else {
 		defer alreadyRunning.Close()
@@ -136,7 +136,7 @@ func Run() {
 // Listens for key codes.
 func ListenForKeyboardInput(config *util.Config) {
 	var keyCode = make([]byte, 1)
-	util.Out("Listening for keys: [D+Return]: Print Stacktrace | [R+Return]: Restart client.")
+	util.Out("Listening for keys: [%s]: Print Stacktrace | [%s]: Restart client.", "D+Return", "R+Return")
 	for {
 		if n, err := os.Stdin.Read(keyCode); err == nil && n == 1 {
 			switch keyCode[0] {
@@ -160,7 +160,7 @@ func handleWorkingDirectory(dir string) {
 		util.Out("Changing working directory to %v", dir)
 
 		if fi, err := os.Stat(dir); err != nil && os.IsNotExist(err) {
-			util.Out("Working directory %v does not exist, creating it now.", dir)
+			util.Out("WARN: Working directory %v does not exist, creating it now.", dir)
 			if err = os.MkdirAll(dir, os.ModeDir); err != nil {
 				panic(fmt.Sprintf("Failed creating working directory %v, stopping here to prevent any damage. Cause: %v", dir, err))
 			}

@@ -110,7 +110,7 @@ func (self *JenkinsNodeMonitor) monitor(config *util.Config) {
 				self.forceReconnect(config)
 			}
 
-			util.GOut("monitor", "Node is OFFLINE in Jenkins.")
+			util.GOut("monitor", "WARN: Node is OFFLINE in Jenkins.")
 			self.onlineShown = false
 		}
 	} else {
@@ -118,7 +118,7 @@ func (self *JenkinsNodeMonitor) monitor(config *util.Config) {
 		self.offlineCount = 0
 
 		if self.onlineShown {
-			util.GOut("monitor", "Node went OFFLINE locally.")
+			util.GOut("monitor", "WARN: Node went OFFLINE locally.")
 			self.onlineShown = false
 		}
 	}
@@ -135,7 +135,7 @@ func (self *JenkinsNodeMonitor) isServerSideConnected(config *util.Config) (conn
 	if status, err := GetJenkinsNodeStatus(config); err == nil {
 		return !status.Offline, status.Idle
 	} else {
-		util.GOut("monitor", "Failed to monitor node %v using %v. Cause: %v", config.ClientName, config.CIHostURI, err)
+		util.GOut("monitor", "ERROR: Failed to monitor node %v using %v. Cause: %v", config.ClientName, config.CIHostURI, err)
 		return false, true
 	}
 }
@@ -143,7 +143,7 @@ func (self *JenkinsNodeMonitor) isServerSideConnected(config *util.Config) (conn
 // Forces a reconnect with Jenkins by stopping the current mode.
 func (self *JenkinsNodeMonitor) forceReconnect(config *util.Config) {
 	if self.isThisSideConnected(config) {
-		util.GOut("monitor", "This node appears dead in Jenkins, forcing a reconnect.")
+		util.GOut("monitor", "WARN: This node appears dead in Jenkins, forcing a reconnect.")
 		modes.GetConfiguredMode(config).Stop()
 	}
 }

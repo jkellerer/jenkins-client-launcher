@@ -79,7 +79,7 @@ func RunConfiguredMode(config *util.Config) bool {
 	err := executableMode.Start(config)
 
 	if err != nil {
-		util.Out("Failed to start mode '%v'; Cause: %v", executableMode.Name(), err)
+		util.Out("ERROR: Failed to start mode '%v'; Cause: %v", executableMode.Name(), err)
 		return false
 	} else {
 		callListeners(executableMode, ModeStarted, config)

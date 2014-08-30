@@ -68,13 +68,13 @@ func (self *ClientMode) Status() *util.AtomicInt32 {
 
 func (self *ClientMode) IsConfigAcceptable(config *util.Config) (bool) {
 	if !config.HasCIConnection() {
-		util.GOut(self.Name(), "No Jenkins URI defined. Cannot connect to the CI server.")
+		util.GOut(self.Name(), "ERROR: No Jenkins URI defined. Cannot connect to the CI server.")
 		return false
 	}
 
 	if config.SecretKey == "" && !self.isAuthCredentialsPassedViaCommandline(config) {
 		if config.SecretKey = self.getSecretFromJenkins(config); config.SecretKey == "" {
-			util.GOut(self.Name(), "No secret key set for node %v and the attempt to fetch it from Jenkins failed.", config.ClientName)
+			util.GOut(self.Name(), "ERROR: No secret key set for node %v and the attempt to fetch it from Jenkins failed.", config.ClientName)
 			return false
 		}
 	}
@@ -151,7 +151,7 @@ func (self *ClientMode) execute(config *util.Config) {
 		util.GOut("client", "Starting: %s", append([]string{util.Java}, commandline...))
 
 		if err := command.Start(); err != nil {
-			util.GOut("client", "Jenkins client failed to start with %v", err)
+			util.GOut("client", "ERROR: Jenkins client failed to start with %v", err)
 		} else {
 			util.GOut("client", "Jenkins client was started.")
 
@@ -162,7 +162,7 @@ func (self *ClientMode) execute(config *util.Config) {
 			}()
 
 			if err := command.Wait(); err != nil {
-				util.GOut("client", "Jenkins client quit with %v", err)
+				util.GOut("client", "WARN: Jenkins client quit with %v", err)
 			} else {
 				util.GOut("client", "Jenkins client was stopped.")
 			}
@@ -205,7 +205,7 @@ func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.Read
 			}
 
 			if config.ClientMonitorConsole && config.ConsoleMonitor.IsRestartTriggered(string(line)) {
-				util.GOut("client", "RESTART TOKEN found. Client state may be invalid, forcing a restart.")
+				util.GOut("client", "WARN: %s found in console output. Client state may be invalid, forcing a restart.", "RESTART TOKEN")
 				go func() {
 					time.Sleep(time.Second * 1)
 					self.Stop()
@@ -230,12 +230,12 @@ func (self *ClientMode) getSecretFromJenkins(config *util.Config) string {
 				return self.extractSecret(content)
 			}
 		} else {
-			util.GOut("client", "Failed fetching secret key from Jenkins. Cause: %v", response.Status)
+			util.GOut("client", "ERROR: Failed fetching secret key from Jenkins. Cause: %v", response.Status)
 		}
 	}
 
 	if err != nil {
-		util.GOut("client", "Failed fetching secret key from Jenkins. Cause: %v", err)
+		util.GOut("client", "ERROR: Failed fetching secret key from Jenkins. Cause: %v", err)
 	}
 
 	return ""
