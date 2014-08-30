@@ -13,6 +13,9 @@ import (
 	"io"
 	"os"
 	"bufio"
+	"encoding/xml"
+	"bytes"
+	"strings"
 )
 
 /** Jenkins Client CLI help:
@@ -107,16 +110,26 @@ func (self *ClientMode) execute(config *util.Config) {
 	commandline := []string{}
 	commandline = append(commandline, util.JavaArgs...)
 	commandline = append(commandline, config.JavaArgs...)
+
 	if config.JavaMaxMemory != "" {
-		commandline = append(commandline, "-Xmx" + config.JavaMaxMemory)
+		commandline = append(commandline, "-Xmx"+config.JavaMaxMemory)
 	}
 
-	commandline = append(commandline,
-		"-jar", util.ClientJar,
-		"-jnlpUrl", fmt.Sprintf("%v/computer/%v/slave-agent.jnlp", config.CIHostURI, config.ClientName))
+	commandline = append(commandline, "-jar", util.ClientJar)
 
-	if config.SecretKey != "" {
-		commandline = append(commandline, "-secret", config.SecretKey)
+	if len(util.JnlpArgs) > 0 {
+		if err := ioutil.WriteFile("~slave-agent.jnlp", self.getCustomizedAgentJnlp(config), os.ModeTemporary); err == nil {
+			defer os.Remove("~slave-agent.jnlp")
+			commandline = append(commandline, "-jnlpUrl", "file:./~slave-agent.jnlp")
+		} else {
+			util.GOut("client", "ERROR: Failed creating customized JNLP config. Cause: %v", err)
+		}
+	} else {
+		commandline = append(commandline, "-jnlpUrl", fmt.Sprintf("%v/computer/%v/slave-agent.jnlp", config.CIHostURI, config.ClientName))
+
+		if config.SecretKey != "" && !self.isAuthCredentialsPassedViaCommandline(config) {
+			commandline = append(commandline, "-secret", config.SecretKey)
+		}
 	}
 
 	if config.CIAcceptAnyCert {
@@ -148,7 +161,7 @@ func (self *ClientMode) execute(config *util.Config) {
 			panic("Failed connecting stderr with console")
 		}
 
-		util.GOut("client", "Starting: %s", append([]string{util.Java}, commandline...))
+		util.GOut("client", "Starting: %s", self.createFilteredCommands(commandline))
 
 		if err := command.Start(); err != nil {
 			util.GOut("client", "ERROR: Jenkins client failed to start with %v", err)
@@ -187,6 +200,19 @@ func (self *ClientMode) execute(config *util.Config) {
 
 func (self *ClientMode) isAuthCredentialsPassedViaCommandline(config *util.Config) bool {
 	return config.CIUsername != "" && config.CIPassword != "" && config.PassCIAuth
+}
+
+func (self *ClientMode) createFilteredCommands(commandline []string) (commands []string) {
+	name := ""
+	commands = append([]string{util.Java}, commandline...)
+	for index, value := range commands {
+		if strings.HasPrefix(value, "-") {
+			name = strings.ToLower(value)
+		} else if strings.Contains(name, "auth") || strings.Contains(name, "credentials") || strings.Contains(name, "password") {
+			commands[index] = "***"
+		}
+	}
+	return
 }
 
 func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.ReadCloser, output io.Writer) {
@@ -248,6 +274,90 @@ func (self *ClientMode) extractSecret(content []byte) string {
 		}
 	}
 	return ""
+}
+
+func (self *ClientMode) getCustomizedAgentJnlp(config *util.Config) []byte {
+	response, err := config.CIGet(fmt.Sprintf("computer/%s/slave-agent.jnlp", config.ClientName))
+	if err == nil {
+		defer response.Body.Close()
+
+		if response.StatusCode == 200 {
+			var content []byte
+			if content, err = ioutil.ReadAll(response.Body); err == nil {
+				return self.applyCustomJnlpArgs(config, content)
+			}
+		} else {
+			util.GOut("client", "ERROR: Failed JNLP config from Jenkins. Cause: %v", response.Status)
+		}
+	}
+
+	if err != nil {
+		util.GOut("client", "ERROR: Failed JNLP config from Jenkins. Cause: %v", err)
+	}
+
+	return nil
+}
+
+func (self *ClientMode) applyCustomJnlpArgs(config *util.Config, content []byte) []byte {
+	xmlReader := xml.NewDecoder(bytes.NewReader(content))
+	outputBuffer := &bytes.Buffer{}
+	xmlWriter := xml.NewEncoder(outputBuffer)
+	xmlWriter.Indent("", "  ")
+
+	argumentStart := xml.StartElement{Name:xml.Name{Space:"", Local:"argument"}}
+	argumentEnd := argumentStart.End()
+	skipArguments := 0
+	nextIsArgumentContent := false
+
+nextToken:
+	for {
+		if t, _ := xmlReader.Token(); t == nil {
+			break;
+		} else {
+			switch xmlNode := t.(type) {
+			case xml.StartElement:
+				if nextIsArgumentContent = xmlNode.Name.Local == "argument"; nextIsArgumentContent {
+					continue nextToken
+				}
+				break
+			case xml.CharData:
+				xmlNode = xml.CharData(bytes.Trim(xmlNode, "\n\r\t"))
+				t = xmlNode
+
+				if nextIsArgumentContent {
+					if _, overridesArgument := util.JnlpArgs[string(xmlNode)]; overridesArgument {
+						skipArguments = 2
+					} else if (skipArguments == 0) {
+						xmlWriter.EncodeToken(argumentStart)
+					}
+					nextIsArgumentContent = false
+				}
+				break
+			case xml.EndElement:
+				if skipArguments > 0 && xmlNode.Name.Local == "argument" {
+					skipArguments--
+				}
+
+				if xmlNode.Name.Local == "application-desc" {
+					for argName, argValue := range util.JnlpArgs {
+						for _, value := range []string{argName, argValue} {
+							xmlWriter.EncodeToken(argumentStart)
+							xmlWriter.EncodeToken(xml.CharData(value))
+							xmlWriter.EncodeToken(argumentEnd)
+						}
+					}
+				}
+				break
+			}
+
+			if skipArguments == 0 {
+				xmlWriter.EncodeToken(t)
+			}
+		}
+	}
+
+	xmlWriter.Flush()
+	return outputBuffer.Bytes()
 }
 
 // Registering the client mode.

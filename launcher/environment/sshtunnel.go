@@ -16,20 +16,19 @@ import (
 	"net/url"
 	"net/http"
 	"strings"
-	"io/ioutil"
-	"encoding/xml"
-	"bytes"
 )
 
 // Implements the establishing of an SSH tunnel between the node and the jenkins server.
 type SSHTunnelEstablisher struct {
 	closables []io.Closer
+	ciHostURL *url.URL
 }
 
 // Creates a new tunnel establisher.
 func NewSSHTunnelEstablisher(registerInMode bool) *SSHTunnelEstablisher {
 	self := new(SSHTunnelEstablisher)
 	self.closables = []io.Closer{}
+	self.ciHostURL = nil
 
 	if registerInMode {
 		modes.RegisterModeListener(func(mode modes.ExecutableMode, nextStatus int32, config *util.Config) {
@@ -38,7 +37,14 @@ func NewSSHTunnelEstablisher(registerInMode bool) *SSHTunnelEstablisher {
 			}
 
 			if nextStatus == modes.ModeStarting {
+				var err error;
+				if self.ciHostURL, err = url.Parse(config.CIHostURI); err != nil {
+					util.GOut("ssh-tunnel", "ERROR: Failed parsing Jenkins URI. Cannot tunnel connections to Jenkins. Cause: %v", err)
+					return
+				}
+
 				self.setupSSHTunnel(config)
+
 			} else if nextStatus == modes.ModeStopped {
 				self.tearDownSSHTunnel(config)
 			}
@@ -70,19 +76,31 @@ func (self *SSHTunnelEstablisher) Prepare(config *util.Config) {
 
 // Closes a previously opened SSL connection.
 func (self *SSHTunnelEstablisher) tearDownSSHTunnel(config *util.Config) {
+	if self.ciHostURL == nil {
+		return
+	}
+
+	config.CIHostURI = self.ciHostURL.String()
+
 	if self.closables != nil && len(self.closables) > 0 {
 		for i := len(self.closables) - 1; i >= 0; i-- {
 			self.closables[i].Close()
 		}
 		self.closables = self.closables[0:0]
-
-		// Reset tunnel again.
-		self.applyTunnelAddress(config, "")
 	}
 }
 
 // Opens a new SSH connection, opens a local server port and forwards it to the JNLP port on Jenkins.
 func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
+	if self.ciHostURL == nil {
+		return
+	}
+
+	if !config.PassCIAuth && config.SecretKey != "" {
+		util.GOut("ssh-tunnel", "WARN: Secret key is not supported in combination with SSH tunnel. Implicitly setting %v to %v", "client>passAuth", "true");
+		config.PassCIAuth = true
+	}
+
 	// Ensure no other SSL connections are still open.
 	self.tearDownSSHTunnel(config)
 
@@ -118,34 +136,48 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 		return
 	}
 
-	// Creating a local server listener port to use for forwarding.
-	serverListener, err := net.Listen("tcp", "localhost:0")
-	if err == nil {
-		self.closables = append(self.closables, serverListener)
-		util.GOut("ssh-tunnel", "Opened local listener on '%v'.", serverListener.Addr())
-
-		if err = self.applyTunnelAddress(config, serverListener.Addr().String()); err != nil {
-			util.GOut("ssh-tunnel", "ERROR: Failed configuring local listener as tunnel inside Jenkins. Cause: %v", err)
-			return
-		}
-	} else {
-		util.GOut("ssh-tunnel", "ERROR: Failed opening local listener. Cause: %v", err)
-		return
-	}
-
-	// Forward local connections to the JNLP port.
-	go self.forwardLocalConnectionsToJNLP(config, serverListener, sshClient)
-}
-
-// Forwards the local server listener to the JNLP host:port using the SSH connection as tunnel.
-// What this method does is the same as "ssh -L $ANY-PORT:jenkins-host:$JNLP-PORT" jenkins-host.
-func (self *SSHTunnelEstablisher) forwardLocalConnectionsToJNLP(config *util.Config, serverListener net.Listener, sshClient *ssh.Client) {
+	// Fetching target ports
 	jnlpAddress, err := self.formatJNLPHostAndPort(config)
 	if err != nil {
 		util.GOut("ssh-tunnel", "ERROR: Failed fetching JNLP port from '%v'. Cause: %v.", config.CIHostURI, err)
 		return
 	}
 
+	// Creating a local server listeners to use for port forwarding.
+	httpListener, err1 := self.newLocalServerListener()
+	jnlpListener, err2 := self.newLocalServerListener()
+
+	if err1 != nil || err2 != nil {
+		self.tearDownSSHTunnel(config)
+		return
+	}
+
+	// Forward local connections to the HTTP(S)/JNLP ports.
+	go self.forwardLocalConnectionsTo(config, sshClient, httpListener, self.ciHostURL.Host)
+	go self.forwardLocalConnectionsTo(config, sshClient, jnlpListener, jnlpAddress)
+
+	// Apply the tunnel configuration
+	localCiURL, _ := url.Parse(self.ciHostURL.String())
+	localCiURL.Host = httpListener.Addr().String()
+	config.CIHostURI = localCiURL.String()
+	util.JnlpArgs["-url"] = localCiURL.String()
+	util.JnlpArgs["-tunnel"] = jnlpListener.Addr().String()
+}
+
+func (self *SSHTunnelEstablisher) newLocalServerListener() (serverListener net.Listener, err error) {
+	serverListener, err = net.Listen("tcp", "localhost:0")
+	if err == nil {
+		self.closables = append(self.closables, serverListener)
+		util.GOut("ssh-tunnel", "Opened local listener on '%v'.", serverListener.Addr())
+	} else {
+		util.GOut("ssh-tunnel", "ERROR: Failed opening local listener. Cause: %v", err)
+	}
+	return
+}
+
+// Forwards the local server listener to the specified target address (format host:port) using the SSH connection as tunnel.
+// What this method does is the same as "ssh -L $ANY-PORT:jenkins-host:$TARGET-PORT" jenkins-host.
+func (self *SSHTunnelEstablisher) forwardLocalConnectionsTo(config *util.Config, sshClient *ssh.Client, serverListener net.Listener, targetAddress string) {
 	establishBIDITransport := func(source net.Conn, target net.Conn) {
 		transfer := func(source io.ReadCloser, target io.Writer) {
 			defer source.Close()
@@ -156,16 +188,21 @@ func (self *SSHTunnelEstablisher) forwardLocalConnectionsToJNLP(config *util.Con
 		go transfer(target, source)
 	}
 
+	sshAddress := sshClient.Conn.RemoteAddr().String()
+	localAddress := serverListener.Addr().String()
+
+	util.GOut("ssh-tunnel", "Forwarding local connections on '%v' to '%v' via '%v'.", localAddress, targetAddress, sshAddress)
+
 	for {
 		if sourceConnection, err := serverListener.Accept(); err == nil {
-			if targetConnection, err := sshClient.Dial("tcp", jnlpAddress); err == nil {
-				util.GOut("ssh-tunnel", "Forwarding local connection to '%v' via '%v'.", jnlpAddress, sshClient.Conn.RemoteAddr().String())
+
+			if targetConnection, err := sshClient.Dial("tcp", targetAddress); err == nil {
 				establishBIDITransport(sourceConnection, targetConnection)
 			} else {
-				util.GOut("ssh-tunnel", "ERROR: Failed forwarding incoming local connection to '%v' via '%v'.", jnlpAddress, sshClient.Conn.RemoteAddr().String())
+				util.GOut("ssh-tunnel", "ERROR: Failed forwarding incoming local connection on '%v' to '%v' via '%v'.", localAddress, targetAddress, sshAddress)
 			}
 		} else {
-			util.GOut("ssh-tunnel", "ERROR: Failed accepting next incoming local connection, assuming connection was closed.")
+			util.GOut("ssh-tunnel", "Stop forwarding local connections on '%v' to '%v'.", localAddress, targetAddress)
 			return
 		}
 	}
@@ -173,15 +210,9 @@ func (self *SSHTunnelEstablisher) forwardLocalConnectionsToJNLP(config *util.Con
 
 // Returns "hort:port" of the JNLP server listener.
 func (self *SSHTunnelEstablisher) formatJNLPHostAndPort(config *util.Config) (jnlpAddress string, err error) {
-	jnlpHost := "localhost"
-	jenkinsUrl, err := url.Parse(config.CIHostURI)
-	if err != nil {
-		util.GOut("ssh-tunnel", "ERROR: Failed extracting host out of url '%v'. Cause: %v.", config.CIHostURI, err)
-	} else {
-		jnlpHost = jenkinsUrl.Host
-		if containsPort, _ := regexp.MatchString("^.+:[0-9]+$", jnlpHost); containsPort {
-			jnlpHost = jnlpHost[0:strings.LastIndex(jnlpHost, ":")]
-		}
+	jnlpHost := self.ciHostURL.Host
+	if containsPort, _ := regexp.MatchString("^.+:[0-9]+$", jnlpHost); containsPort {
+		jnlpHost = jnlpHost[0:strings.LastIndex(jnlpHost, ":")]
 	}
 
 	if jnlpPort, err := self.getJNLPListenerPort(config); err == nil {
@@ -223,71 +254,6 @@ func (self *SSHTunnelEstablisher) formatHostFingerprint(key ssh.PublicKey) strin
 	valueMD5 := md5.Sum(value)
 	fingerprint := hex.EncodeToString([]byte(valueMD5[:]))
 	return twoDigitHexMatcher.ReplaceAllString(fingerprint, "$1:")[0:len(valueMD5)*3-1]
-}
-
-var tunnelReplacer, _ = regexp.Compile("(?i)(<tunnel>)(.*?)(</tunnel>)")
-var tunnelReplacement = "${1}%s${3}"
-var singleLauncherReplacer, _ = regexp.Compile("(?i)(<launcher[^>]+?)(/>)")
-var singleLauncherReplacement = "${1}>\n    <tunnel>%s</tunnel>\n  </launcher>"
-var launcherReplacer, _ = regexp.Compile("(?i)(</launcher>)")
-var launcherReplacement = "  <tunnel>%s</tunnel>\n  ${1}"
-
-// Updates or adds the local tunnel address:port to the specified Jenkins node config XML.
-func (self *SSHTunnelEstablisher) updateOrAddTunnelAddress(configXML []byte, hostAndPort string) (updatedXML []byte) {
-	buffer := bytes.NewBuffer(make([]byte, 0, len(hostAndPort)+10))
-	if err := xml.EscapeText(buffer, []byte(hostAndPort)); err == nil {
-		hostAndPort = string(buffer.Bytes())
-	}
-
-	updatedXML = tunnelReplacer.ReplaceAll(configXML, []byte(fmt.Sprintf(tunnelReplacement, hostAndPort)))
-	if bytes.Equal(updatedXML, configXML) {
-		updatedXML = singleLauncherReplacer.ReplaceAll(configXML, []byte(fmt.Sprintf(singleLauncherReplacement, hostAndPort)))
-		if bytes.Equal(updatedXML, configXML) {
-			updatedXML = launcherReplacer.ReplaceAll(configXML, []byte(fmt.Sprintf(launcherReplacement, hostAndPort)))
-		}
-	}
-
-	return
-}
-
-// Applies the local tunnel address:port to the settings of the node inside Jenkins.
-func (self *SSHTunnelEstablisher) applyTunnelAddress(config *util.Config, hostAndPort string) error {
-	nodeConfigPath := fmt.Sprintf("/computer/%s/config.xml", config.ClientName)
-
-	if response, err := config.CIGet(nodeConfigPath); err == nil {
-		defer response.Body.Close()
-		if configXML, err := ioutil.ReadAll(response.Body); err == nil {
-			// If we have changes, we apply them now.
-			if updatedXML := self.updateOrAddTunnelAddress(configXML, hostAndPort); !bytes.Equal(updatedXML, configXML) {
-				success := false
-				failedMessage := ""
-
-				if request, err := config.CIRequest("POST", nodeConfigPath, bytes.NewReader(updatedXML)); err == nil {
-					request.Header.Add("Content-Type", "application/xml")
-					if response, err := config.CIClient().Do(request); err == nil {
-						response.Body.Close()
-						success = response.StatusCode == 200
-						failedMessage = fmt.Sprintf("%v", response.Status)
-					} else {
-						failedMessage = fmt.Sprintf("%v", err)
-					}
-				} else {
-					failedMessage = fmt.Sprintf("%v", err)
-				}
-
-				if success {
-					util.GOut("ssh-tunnel", "Updated node '%s' to tunnel connections via '%s'", config.ClientName, hostAndPort)
-				} else {
-					return fmt.Errorf(failedMessage)
-				}
-			}
-			return nil
-		} else {
-			return err
-		}
-	} else {
-		return err
-	}
 }
 
 // Registering the tunnel establisher.

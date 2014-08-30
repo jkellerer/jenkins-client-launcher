@@ -22,6 +22,9 @@ var Java = ""
 // Contains additional java args that are added before the configured java args.
 var JavaArgs = []string{}
 
+// Contains additional arguments that must be injected into the JNLP config file that is downloaded from Jenkins.
+var JnlpArgs = make(map[string]string)
+
 // Prints stack traces of all go routines.
 func PrintAllStackTraces() {
 	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
