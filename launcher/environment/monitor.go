@@ -22,7 +22,6 @@ var nodeMonitoringInterval = time.Second * 15
 var maxOfflineCountBeforeRestart = int16(4)
 
 type JenkinsNodeStatus struct {
-	XMLName              xml.Name  `xml:"slaveComputer"`
 	DisplayName          string `xml:"displayName"`
 	Idle                 bool `xml:"idle"`
 	Offline              bool `xml:"offline"`

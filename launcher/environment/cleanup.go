@@ -27,7 +27,6 @@ var minCleanupTTL = time.Hour * 6
 var minMonitoringInterval = time.Hour * 2
 
 type JenkinsNodeConfig struct {
-	XMLName     xml.Name `xml:"slave"`
 	Name        string   `xml:"name"`
 	RemoteFS    string   `xml:"remoteFS"`
 }
