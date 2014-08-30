@@ -16,10 +16,10 @@ const (
 )
 
 // The interval when the jenkins node is monitored.
-var nodeMonitoringInterval = time.Minute * 2
+var nodeMonitoringInterval = time.Second * 15
 
 // The max number of offline results in a row until a reconnect is forced.
-var maxOfflineCountBeforeRestart = int16(2)
+var maxOfflineCountBeforeRestart = int16(4)
 
 type JenkinsNodeStatus struct {
 	XMLName              xml.Name  `xml:"slaveComputer"`
@@ -90,7 +90,7 @@ func (self *JenkinsNodeMonitor) Prepare(config *util.Config) {
 // Forces a restart of the connector when offline count reaches the threshold.
 func (self *JenkinsNodeMonitor) monitor(config *util.Config) {
 	if self.isThisSideConnected(config) {
-		if connected, idle := self.isServerSideConnected(config); connected {
+		if connected, idle, serverReachable := self.isServerSideConnected(config); connected {
 			util.NodeIsIdle.Set(idle)
 			self.offlineCount = 0
 
@@ -100,7 +100,10 @@ func (self *JenkinsNodeMonitor) monitor(config *util.Config) {
 			}
 		} else {
 			util.NodeIsIdle.Set(true)
-			self.offlineCount++
+
+			if serverReachable {
+				self.offlineCount++
+			}
 
 			if self.offlineCount > 3 * maxOfflineCountBeforeRestart {
 				self.offlineCount = maxOfflineCountBeforeRestart
@@ -131,12 +134,12 @@ func (self *JenkinsNodeMonitor) isThisSideConnected(config *util.Config) bool {
 }
 
 // Checks if Jenkins shows this node as connected and returns the node's IDLE state as second return value.
-func (self *JenkinsNodeMonitor) isServerSideConnected(config *util.Config) (connected bool, idle bool) {
+func (self *JenkinsNodeMonitor) isServerSideConnected(config *util.Config) (connected bool, idle bool, serverReachable bool) {
 	if status, err := GetJenkinsNodeStatus(config); err == nil {
-		return !status.Offline, status.Idle
+		return !status.Offline, status.Idle, true
 	} else {
 		util.GOut("monitor", "ERROR: Failed to monitor node %v using %v. Cause: %v", config.ClientName, config.CIHostURI, err)
-		return false, true
+		return false, true, false
 	}
 }
 
