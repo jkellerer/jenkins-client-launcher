@@ -125,15 +125,16 @@ func (self *SSHTunnelEstablisher) resetAliveStateMonitoring(config *util.Config)
 
 // Closes a previously opened SSL connection.
 func (self *SSHTunnelEstablisher) tearDownSSHTunnel(config *util.Config) {
-	defer self.tunnelConnected.Set(false)
-
 	if self.ciHostURL == nil {
 		return
 	}
 
+	self.tunnelConnected.Set(false)
 	self.resetAliveStateMonitoring(config)
 
 	config.CIHostURI = self.ciHostURL.String()
+	delete(util.JnlpArgs, "-url")
+	delete(util.JnlpArgs, "-tunnel")
 
 	if self.closables != nil && len(self.closables) > 0 {
 		for i := len(self.closables) - 1; i >= 0; i-- {
@@ -148,8 +149,6 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 	if self.ciHostURL == nil {
 		return
 	}
-
-	defer self.tunnelConnected.Set(true)
 
 	if !config.PassCIAuth && config.SecretKey != "" {
 		util.GOut("ssh-tunnel", "WARN: Secret key is not supported in combination with SSH tunnel. Implicitly setting %v to %v", "client>passAuth", "true");
@@ -219,6 +218,9 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 	config.CIHostURI = localCiURL.String()
 	util.JnlpArgs["-url"] = localCiURL.String()
 	util.JnlpArgs["-tunnel"] = jnlpListener.Addr().String()
+
+	// Mark tunnel as connected when we passed this line.
+	self.tunnelConnected.Set(true)
 }
 
 // Opens a new local server socket.
