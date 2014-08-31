@@ -73,3 +73,9 @@ func (self *AtomicInt32) Get() int32 {
 	self.mutex.Lock(); defer self.mutex.Unlock()
 	return self.value
 }
+
+func (self *AtomicInt32) AddAndGet(delta int32) int32 {
+	self.mutex.Lock(); defer self.mutex.Unlock()
+	self.value += delta
+	return self.value
+}

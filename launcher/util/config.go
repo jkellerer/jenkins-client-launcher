@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
+	"sync"
 )
 
 // Implemented by types that verify if the configuration is valid for them.
@@ -77,6 +78,8 @@ type JenkinsConnection struct {
 	CITunnelSSHPassword    string `xml:"ci>tunnel>jnlp>ssh>auth>password"`
 	ciCrumbHeader          string `xml:"-"`
 	ciCrumbValue           string `xml:"-"`
+	httpClient             *http.Client
+	httpClientInitializer  sync.Once
 }
 
 // Returns true if the configuration has a Jenkins url.
@@ -87,16 +90,18 @@ func (self *JenkinsConnection) HasCIConnection() bool {
 
 // Returns a HTTP client that is configured to connect with Jenkins.
 func (self *JenkinsConnection) CIClient() *http.Client {
-	client := http.DefaultClient
+	self.httpClientInitializer.Do(func() {
+		// Note: Keep-Alive doesn't seem to work always with SSH tunnel, disabling it by default.
+		tr := &http.Transport{DisableKeepAlives: true}
 
-	if self.CIAcceptAnyCert {
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		if self.CIAcceptAnyCert {
+			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		}
-		client = &http.Client{Transport: tr}
-	}
 
-	return client
+		self.httpClient = &http.Client{Transport: tr}
+	})
+
+	return self.httpClient
 }
 
 // Returns a request object which may be used with CIClient to do a HTTP request.

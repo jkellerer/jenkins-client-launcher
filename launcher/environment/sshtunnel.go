@@ -16,12 +16,19 @@ import (
 	"net/url"
 	"net/http"
 	"strings"
+	"math"
+	"time"
 )
+
+// The interval when the the SSH tunnel tries to reach Jenkins to see if the SSH tunnel is still alive.
+var nodeSshTunnelAliveMonitoringInterval = time.Second * 30
 
 // Implements the establishing of an SSH tunnel between the node and the jenkins server.
 type SSHTunnelEstablisher struct {
 	closables []io.Closer
 	ciHostURL *url.URL
+	aliveTicker *time.Ticker
+	aliveTickEvaluator *time.Ticker
 }
 
 // Creates a new tunnel establisher.
@@ -79,6 +86,8 @@ func (self *SSHTunnelEstablisher) tearDownSSHTunnel(config *util.Config) {
 	if self.ciHostURL == nil {
 		return
 	}
+
+	self.stopMonitoringAliveState()
 
 	config.CIHostURI = self.ciHostURL.String()
 
@@ -164,8 +173,52 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 	config.CIHostURI = localCiURL.String()
 	util.JnlpArgs["-url"] = localCiURL.String()
 	util.JnlpArgs["-tunnel"] = jnlpListener.Addr().String()
+
+	// Monitor that the tunnel is not hanging.
+	self.startMonitoringAliveState(config)
 }
 
+// Stops monitoring the alive state.
+func (self *SSHTunnelEstablisher) stopMonitoringAliveState() {
+	for _, ticker := range []*time.Ticker{self.aliveTicker, self.aliveTickEvaluator} {
+		if (ticker != nil) {
+			ticker.Stop()
+			ticker = nil
+		}
+	}
+}
+
+// Monitors that the tunnel is alive by periodically querying the node status off Jenkins.
+// Timeout, hanging connections or connection errors lead to a restart of the current execution mode (which implicitly closes SSH tunnel as well).
+func (self *SSHTunnelEstablisher) startMonitoringAliveState(config *util.Config) {
+	self.stopMonitoringAliveState()
+
+	self.aliveTicker, self.aliveTickEvaluator = time.NewTicker(nodeSshTunnelAliveMonitoringInterval), time.NewTicker(nodeSshTunnelAliveMonitoringInterval)
+	expectedAliveTick, lastAliveTick := util.NewAtomicInt32(), util.NewAtomicInt32()
+
+	// Periodically check the node status and increment lastAliveTick on success
+	go func() {
+		for _ = range self.aliveTicker.C {
+			if _, err := GetJenkinsNodeStatus(config); err == nil {
+				lastAliveTick.Set(expectedAliveTick.Get());
+			}
+		}
+	}()
+
+	// Periodically check that lastAliveTick was incremented.
+	go func() {
+		for _ = range self.aliveTickEvaluator.C {
+			if math.Abs(float64(expectedAliveTick.Get() - lastAliveTick.Get())) > 1 {
+				util.GOut("ssh-tunnel", "WARN: The SSH tunnel appears to be dead or Jenkins is gone. Forcing restart of client and SSH tunnel.")
+				modes.GetConfiguredMode(config).Stop()
+			} else {
+				expectedAliveTick.AddAndGet(1)
+			}
+		}
+	}()
+}
+
+// Opens a new local server socket.
 func (self *SSHTunnelEstablisher) newLocalServerListener() (serverListener net.Listener, err error) {
 	serverListener, err = net.Listen("tcp", "localhost:0")
 	if err == nil {
@@ -179,26 +232,25 @@ func (self *SSHTunnelEstablisher) newLocalServerListener() (serverListener net.L
 
 // Forwards the local server listener to the specified target address (format host:port) using the SSH connection as tunnel.
 // What this method does is the same as "ssh -L $ANY-PORT:jenkins-host:$TARGET-PORT" jenkins-host.
-func (self *SSHTunnelEstablisher) forwardLocalConnectionsTo(config *util.Config, sshClient *ssh.Client, serverListener net.Listener, targetAddress string) {
-	establishBIDITransport := func(source net.Conn, target net.Conn) {
-		transfer := func(source io.ReadCloser, target io.Writer) {
-			defer source.Close()
-			_, _ = io.Copy(target, source)
-		}
+func (self *SSHTunnelEstablisher) forwardLocalConnectionsTo(config *util.Config, ssh *ssh.Client, listener net.Listener, targetAddress string) {
+	transfer := func(source io.ReadCloser, target io.Writer) {
+		defer source.Close()
+		_, _ = io.Copy(target, source)
+	}
 
+	establishBIDITransport := func(source net.Conn, target net.Conn) {
 		go transfer(source, target)
 		go transfer(target, source)
 	}
 
-	sshAddress := sshClient.Conn.RemoteAddr().String()
-	localAddress := serverListener.Addr().String()
+	sshAddress := ssh.Conn.RemoteAddr().String()
+	localAddress := listener.Addr().String()
 
 	util.GOut("ssh-tunnel", "Forwarding local connections on '%v' to '%v' via '%v'.", localAddress, targetAddress, sshAddress)
 
 	for {
-		if sourceConnection, err := serverListener.Accept(); err == nil {
-
-			if targetConnection, err := sshClient.Dial("tcp", targetAddress); err == nil {
+		if sourceConnection, err := listener.Accept(); err == nil {
+			if targetConnection, err := ssh.Dial("tcp", targetAddress); err == nil {
 				establishBIDITransport(sourceConnection, targetConnection)
 			} else {
 				util.GOut("ssh-tunnel", "ERROR: Failed forwarding incoming local connection on '%v' to '%v' via '%v'.", localAddress, targetAddress, sshAddress)
