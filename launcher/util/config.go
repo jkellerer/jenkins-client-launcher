@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sync"
+	"time"
 )
 
 // Implemented by types that verify if the configuration is valid for them.
@@ -91,8 +92,13 @@ func (self *JenkinsConnection) HasCIConnection() bool {
 // Returns a HTTP client that is configured to connect with Jenkins.
 func (self *JenkinsConnection) CIClient() *http.Client {
 	self.httpClientInitializer.Do(func() {
-		// Note: Keep-Alive doesn't seem to work always with SSH tunnel, disabling it by default.
-		tr := &http.Transport{DisableKeepAlives: true}
+
+		tr := &http.Transport{ResponseHeaderTimeout: time.Duration(time.Minute * 1)}
+
+		// Note: Keep-Alive doesn't seem to work always with SSH tunnel, disabling it by default when connection is made through SSH.
+		if self.CITunnelSSHEnabled {
+			tr.DisableKeepAlives = true
+		}
 
 		if self.CIAcceptAnyCert {
 			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
