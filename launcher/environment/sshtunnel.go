@@ -27,8 +27,12 @@ var nodeSshTunnelAliveMonitoringInterval = time.Second * 30
 type SSHTunnelEstablisher struct {
 	closables []io.Closer
 	ciHostURL *url.URL
+
 	aliveTicker *time.Ticker
 	aliveTickEvaluator *time.Ticker
+	expectedAliveTick *util.AtomicInt32
+	lastAliveTick *util.AtomicInt32
+	tunnelConnected *util.AtomicBoolean
 }
 
 // Creates a new tunnel establisher.
@@ -36,6 +40,10 @@ func NewSSHTunnelEstablisher(registerInMode bool) *SSHTunnelEstablisher {
 	self := new(SSHTunnelEstablisher)
 	self.closables = []io.Closer{}
 	self.ciHostURL = nil
+
+	self.aliveTicker, self.aliveTickEvaluator = time.NewTicker(nodeSshTunnelAliveMonitoringInterval), time.NewTicker(nodeSshTunnelAliveMonitoringInterval)
+	self.expectedAliveTick, self.lastAliveTick = util.NewAtomicInt32(), util.NewAtomicInt32()
+	self.tunnelConnected = util.NewAtomicBoolean()
 
 	if registerInMode {
 		modes.RegisterModeListener(func(mode modes.ExecutableMode, nextStatus int32, config *util.Config) {
@@ -78,16 +86,52 @@ func (self *SSHTunnelEstablisher) IsConfigAcceptable(config *util.Config) (bool)
 }
 
 func (self *SSHTunnelEstablisher) Prepare(config *util.Config) {
-	// Nothing to do in prepare.
+	self.startAliveStateMonitoring(config)
+}
+
+// Monitors that the tunnel is alive by periodically querying the node status off Jenkins.
+// Timeout, hanging connections or connection errors lead to a restart of the current execution mode (which implicitly closes SSH tunnel as well).
+func (self *SSHTunnelEstablisher) startAliveStateMonitoring(config *util.Config) {
+	// Periodically check the node status and increment lastAliveTick on success
+	go func() {
+		for _ = range self.aliveTicker.C {
+			if !self.tunnelConnected.Get() { continue }
+
+			if _, err := GetJenkinsNodeStatus(config); err == nil {
+				self.lastAliveTick.Set(self.expectedAliveTick.Get());
+			}
+		}
+	}()
+
+	// Periodically check that lastAliveTick was incremented.
+	go func() {
+		for _ = range self.aliveTickEvaluator.C {
+			if !self.tunnelConnected.Get() { continue }
+
+			if math.Abs(float64(self.expectedAliveTick.Get() - self.lastAliveTick.Get())) > 1 {
+				util.GOut("ssh-tunnel", "WARN: The SSH tunnel appears to be dead or Jenkins is gone. Forcing restart of client and SSH tunnel.")
+				modes.GetConfiguredMode(config).Stop()
+			} else {
+				self.expectedAliveTick.AddAndGet(1)
+			}
+		}
+	}()
+}
+
+func (self *SSHTunnelEstablisher) resetAliveStateMonitoring(config *util.Config) {
+	self.lastAliveTick.Set(0)
+	self.expectedAliveTick.Set(0)
 }
 
 // Closes a previously opened SSL connection.
 func (self *SSHTunnelEstablisher) tearDownSSHTunnel(config *util.Config) {
+	defer self.tunnelConnected.Set(false)
+
 	if self.ciHostURL == nil {
 		return
 	}
 
-	self.stopMonitoringAliveState()
+	self.resetAliveStateMonitoring(config)
 
 	config.CIHostURI = self.ciHostURL.String()
 
@@ -99,11 +143,13 @@ func (self *SSHTunnelEstablisher) tearDownSSHTunnel(config *util.Config) {
 	}
 }
 
-// Opens a new SSH connection, opens a local server port and forwards it to the JNLP port on Jenkins.
+// Opens a new SSH connection, local server ports (JNLP, HTTP) and forwards it to the corresponding ports on Jenkins.
 func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 	if self.ciHostURL == nil {
 		return
 	}
+
+	defer self.tunnelConnected.Set(true)
 
 	if !config.PassCIAuth && config.SecretKey != "" {
 		util.GOut("ssh-tunnel", "WARN: Secret key is not supported in combination with SSH tunnel. Implicitly setting %v to %v", "client>passAuth", "true");
@@ -173,49 +219,6 @@ func (self *SSHTunnelEstablisher) setupSSHTunnel(config *util.Config) {
 	config.CIHostURI = localCiURL.String()
 	util.JnlpArgs["-url"] = localCiURL.String()
 	util.JnlpArgs["-tunnel"] = jnlpListener.Addr().String()
-
-	// Monitor that the tunnel is not hanging.
-	self.startMonitoringAliveState(config)
-}
-
-// Stops monitoring the alive state.
-func (self *SSHTunnelEstablisher) stopMonitoringAliveState() {
-	for _, ticker := range []*time.Ticker{self.aliveTicker, self.aliveTickEvaluator} {
-		if (ticker != nil) {
-			ticker.Stop()
-			ticker = nil
-		}
-	}
-}
-
-// Monitors that the tunnel is alive by periodically querying the node status off Jenkins.
-// Timeout, hanging connections or connection errors lead to a restart of the current execution mode (which implicitly closes SSH tunnel as well).
-func (self *SSHTunnelEstablisher) startMonitoringAliveState(config *util.Config) {
-	self.stopMonitoringAliveState()
-
-	self.aliveTicker, self.aliveTickEvaluator = time.NewTicker(nodeSshTunnelAliveMonitoringInterval), time.NewTicker(nodeSshTunnelAliveMonitoringInterval)
-	expectedAliveTick, lastAliveTick := util.NewAtomicInt32(), util.NewAtomicInt32()
-
-	// Periodically check the node status and increment lastAliveTick on success
-	go func() {
-		for _ = range self.aliveTicker.C {
-			if _, err := GetJenkinsNodeStatus(config); err == nil {
-				lastAliveTick.Set(expectedAliveTick.Get());
-			}
-		}
-	}()
-
-	// Periodically check that lastAliveTick was incremented.
-	go func() {
-		for _ = range self.aliveTickEvaluator.C {
-			if math.Abs(float64(expectedAliveTick.Get() - lastAliveTick.Get())) > 1 {
-				util.GOut("ssh-tunnel", "WARN: The SSH tunnel appears to be dead or Jenkins is gone. Forcing restart of client and SSH tunnel.")
-				modes.GetConfiguredMode(config).Stop()
-			} else {
-				expectedAliveTick.AddAndGet(1)
-			}
-		}
-	}()
 }
 
 // Opens a new local server socket.
