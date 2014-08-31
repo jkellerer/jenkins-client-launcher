@@ -16,6 +16,7 @@ import (
 	"encoding/xml"
 	"bytes"
 	"strings"
+	"sync"
 )
 
 /** Jenkins Client CLI help:
@@ -150,13 +151,13 @@ func (self *ClientMode) execute(config *util.Config) {
 	go func() {
 		command := exec.Command(util.Java, commandline...)
 		if pOut, err := command.StdoutPipe(); err == nil {
-			go self.redirectConsoleOutput(config, pOut, os.Stdout)
+			go self.redirectConsoleOutput(config, pOut, os.Stdout, util.OutputMutex)
 		} else {
 			panic("Failed connecting stdout with console")
 		}
 
 		if pErr, err := command.StderrPipe(); err == nil {
-			go self.redirectConsoleOutput(config, pErr, os.Stderr)
+			go self.redirectConsoleOutput(config, pErr, os.Stderr, util.OutputMutex)
 		} else {
 			panic("Failed connecting stderr with console")
 		}
@@ -215,19 +216,36 @@ func (self *ClientMode) createFilteredCommands(commandline []string) (commands [
 	return
 }
 
-func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.ReadCloser, output io.Writer) {
+func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.ReadCloser, output io.Writer, outputMutex *sync.Mutex) {
 	defer input.Close()
 	reader := bufio.NewReader(input)
+
+	holdsLock := false
+	lock, unlock := func() {
+		if !holdsLock {
+			outputMutex.Lock()
+			holdsLock = true
+		}
+	}, func() {
+		if holdsLock {
+			outputMutex.Unlock()
+			holdsLock = false
+		}
+	}
+	defer unlock()
 
 	for {
 		line, isPrefix, err := reader.ReadLine()
 
-		if len(line) > 0 {
+		if len(line) > 0 || holdsLock {
+			lock()
+
 			// Send to output
-			output.Write(line)
+			if len(line) > 0 { output.Write(line) }
 
 			if !isPrefix {
 				output.Write([]byte("\n"))
+				unlock()
 			}
 
 			if config.ClientMonitorConsole && config.ConsoleMonitor.IsRestartTriggered(string(line)) {
@@ -239,9 +257,7 @@ func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.Read
 			}
 		}
 
-		if err != nil {
-			return
-		}
+		if err != nil { break }
 	}
 }
 

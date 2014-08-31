@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-var outputMutex = &sync.Mutex{}
+var OutputMutex = &sync.Mutex{}
 var coloredStdOut = ansicolor.NewAnsiColorWriter(os.Stdout)
 var defaultMessageColor = "\x1b[32m"
 var launcherPrefix = fmt.Sprintf("%s>>%sJCL%s:%s", "\x1b[34m\x1b[1m", "\x1b[21m\x1b[34m", "\x1b[39m", "\x1b[39m")
@@ -19,23 +19,23 @@ var launcherGroupPrefix = fmt.Sprintf("%s>>%sJCL%s(%s%s%s):%s", "\x1b[34m\x1b[1m
 
 // Prints a message to the app's console output with optional Printf styled substitutions.
 func Out(message string, a ...interface{}) {
-	outputMutex.Lock()
-	defer outputMutex.Unlock()
+	OutputMutex.Lock()
+	defer OutputMutex.Unlock()
 	fmt.Fprintln(coloredStdOut, launcherPrefix, formatOut(message, defaultMessageColor, a != nil, a...))
 }
 
 // Prints a message to the app's console output with optional Printf styled substitutions.
 // "group" is used to group messages of the same kind.
 func GOut(group string, message string, a ...interface{}) {
-	outputMutex.Lock()
-	defer outputMutex.Unlock()
+	OutputMutex.Lock()
+	defer OutputMutex.Unlock()
 	fmt.Fprintln(coloredStdOut, fmt.Sprintf(launcherGroupPrefix, strings.ToLower(group)), formatOut(message, defaultMessageColor, a != nil, a...))
 }
 
 // Prints a message to the app's console output with optional Printf styled substitutions and without a JCL prefix.
 func FlatOut(message string, a ...interface{}) {
-	outputMutex.Lock()
-	defer outputMutex.Unlock()
+	OutputMutex.Lock()
+	defer OutputMutex.Unlock()
 	fmt.Fprintln(coloredStdOut, "", formatOut(message, "\x1b[0m", a != nil, a...))
 }
 
