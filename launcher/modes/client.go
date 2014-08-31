@@ -234,6 +234,8 @@ func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.Read
 	}
 	defer unlock()
 
+	restartTriggered := false
+
 	for {
 		line, isPrefix, err := reader.ReadLine()
 
@@ -248,12 +250,13 @@ func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.Read
 				unlock()
 			}
 
-			if config.ClientMonitorConsole && config.ConsoleMonitor.IsRestartTriggered(string(line)) {
+			if config.ClientMonitorConsole && !restartTriggered && config.ConsoleMonitor.IsRestartTriggered(string(line)) {
 				go func() {
 					time.Sleep(time.Second * 1)
 					go self.Stop()
 					util.GOut("client", "WARN: %s found in console output. Client state may be invalid, forced a restart.", "RESTART TOKEN")
 				}()
+				restartTriggered = true
 			}
 		}
 
