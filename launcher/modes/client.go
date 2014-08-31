@@ -249,10 +249,10 @@ func (self *ClientMode) redirectConsoleOutput(config *util.Config, input io.Read
 			}
 
 			if config.ClientMonitorConsole && config.ConsoleMonitor.IsRestartTriggered(string(line)) {
-				util.GOut("client", "WARN: %s found in console output. Client state may be invalid, forcing a restart.", "RESTART TOKEN")
 				go func() {
 					time.Sleep(time.Second * 1)
-					self.Stop()
+					go self.Stop()
+					util.GOut("client", "WARN: %s found in console output. Client state may be invalid, forced a restart.", "RESTART TOKEN")
 				}()
 			}
 		}
