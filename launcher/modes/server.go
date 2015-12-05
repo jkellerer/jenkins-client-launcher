@@ -4,8 +4,8 @@
 package modes
 
 import (
-	"code.google.com/p/go.crypto/ssh/terminal"
-	"code.google.com/p/go.crypto/ssh"
+	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/crypto/ssh"
 	"fmt"
 	"io/ioutil"
 	"net"

@@ -5,7 +5,7 @@ package environment
 
 import (
 	"testing"
-	"code.google.com/p/go.crypto/ssh"
+	"golang.org/x/crypto/ssh"
 	"net/url"
 )
 

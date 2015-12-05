@@ -6,7 +6,7 @@ package environment
 import (
 	"github.com/jkellerer/jenkins-client-launcher/launcher/modes"
 	"github.com/jkellerer/jenkins-client-launcher/launcher/util"
-	"code.google.com/p/go.crypto/ssh"
+	"golang.org/x/crypto/ssh"
 	"crypto/md5"
 	"encoding/hex"
 	"regexp"
